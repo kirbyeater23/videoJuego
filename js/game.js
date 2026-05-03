@@ -58,6 +58,7 @@ function loadImg(id, src) {
 // ─── STATE ───────────────────────────────────────────────────────────────────
 const SPEED_TBL = [340, 280, 220, 160];
 const FADE_SPEED = 3.8;
+const LOADING_BLACK_TIME = 0.25;
 let gameMin    = 420;
 let exhaustion = 0;
 let missedTasks     = [];
@@ -67,7 +68,8 @@ let currentScene = 0;
 let nextScene    = 0;
 let nextPlayerX  = START_X;
 let fadeAlpha    = 0;
-let fadeDir      = 0;    // -1 fade-out → 1 fade-in → 0 done
+let fadeDir      = 0;    // -1 fade to black, 2 loading, 1 fade from black, 0 done
+let loadingTimer = 0;
 
 const player = {
   x: START_X, y: GROUND,
@@ -101,19 +103,23 @@ function showNotif(text) {
 }
 
 function gotoScene(idx, startX = START_X) {
+  if (fadeDir !== 0) return;
   nextScene = idx;
   nextPlayerX = startX;
   fadeDir   = -1;
   fadeAlpha = 0;
-  if (window.GameUI) window.GameUI.fadeToBlack();
 }
 
 function addMissed(label, scene) {
+  if (missedTasks.some(t => t.label === label && t.scene === scene)) return false;
   missedTasks.push({ label, scene });
+  return true;
 }
 
 function addDone(label, scene) {
+  if (completedTasks.some(t => t.label === label && t.scene === scene)) return false;
   completedTasks.push({ label, scene });
+  return true;
 }
 
 // ─── DRAW BACKGROUNDS ────────────────────────────────────────────────────────
@@ -346,6 +352,7 @@ class Hotspot {
     this.imgKey = imgKey;
     this.hitbox = hitbox;
     this.hitboxes = hitboxes;
+    this.missed = false;
     this.r = 38;
   }
   isNear(px, py) { return Math.abs(px - this.x) < 85 && Math.abs(py - this.y) < 80; }
@@ -449,7 +456,7 @@ function interactHotspots(hotspots, sceneName, onExit, onDone) {
     if (!selected && !hs.isNear(player.x, player.y)) continue;
     const ok = hs.interact(hotspots);
     if (ok && hs.done) {
-      addDone(hs.label, sceneName);
+      if (!hs.isExit) addDone(hs.label, sceneName);
       if (onDone) onDone(hs);
       if (hs.isExit && onExit) onExit();
     }
@@ -464,10 +471,13 @@ function fireNotifs(notifs, fired) {
   });
 }
 
-function missUndone(hotspots, sceneName) {
+function missUndone(hotspots = [], sceneName) {
   let any = false;
   hotspots.forEach(hs => {
-    if (!hs.done && !hs.isExit) { addMissed(hs.label, sceneName); any = true; }
+    if (!hs.done && !hs.isExit && !hs.missed) {
+      hs.missed = true;
+      if (addMissed(hs.label, sceneName)) any = true;
+    }
   });
   if (any) exhaustion = Math.min(3, exhaustion + 1);
   return any;
@@ -484,15 +494,11 @@ function canLeaveForward(scene) {
 }
 
 function tryLeaveForward(scene) {
-  if (canLeaveForward(scene)) {
-    advance(scene);
-    return true;
-  }
-  player.x = W - 40;
-  if (!notif || notif.text !== 'Termina las tareas antes de salir.') {
-    showNotif('Termina las tareas antes de salir.');
-  }
-  return false;
+  const hadPending = missUndone(scene.hotspots, scene.name);
+  scene.deadlineFired = true;
+  if (hadPending) showNotif('Sales corriendo. Lo pendiente se acumula.');
+  advance(scene);
+  return true;
 }
 
 function goBack(scene) {
@@ -570,6 +576,7 @@ function makeScrollScene(cfg) {
     scrollX: 0,
     maxScroll: 0,
     carT: 0,
+    carX: START_X,
 
     update(dt) {
       if (!this.entered) {
@@ -577,10 +584,43 @@ function makeScrollScene(cfg) {
         this.scrollX = 0;
         this.carT = 0;
         this.maxScroll = Math.max(0, (IMG[this.bgKey]?.width || W) - W);
+        this.carX = START_X;
         player.x = START_X;
         player.targetX = null;
         player.pendingHotspot = null;
         if (cfg.onEnter) cfg.onEnter(this);
+      }
+      if (cfg.vehicle === 'car') {
+        const carSpeed = 520;
+        const keyboardMoving = K['KeyA'] || K['KeyD'];
+        if (K['KeyA']) {
+          if (this.scrollX > 0) this.scrollX = Math.max(0, this.scrollX - carSpeed * dt);
+          else this.carX -= carSpeed * dt;
+        }
+        if (K['KeyD']) {
+          if (this.carX < W * 0.52) this.carX = Math.min(W * 0.52, this.carX + carSpeed * dt);
+          else if (this.scrollX < this.maxScroll) this.scrollX = Math.min(this.maxScroll, this.scrollX + carSpeed * dt);
+          else this.carX += carSpeed * dt;
+        }
+        this.carX = Math.max(40, Math.min(W + EDGE_EXIT + 20, this.carX));
+
+        if (this.carX < -EDGE_EXIT && this.scrollX <= 0) {
+          goBack(this);
+          return;
+        }
+        if (this.maxScroll > 0 && this.scrollX >= this.maxScroll && this.carX > W - 260) {
+          tryLeaveForward(this);
+          return;
+        }
+
+        if (this.deadline && !this.deadlineFired && gameMin >= this.deadline) {
+          this.deadlineFired = true;
+          if (addMissed(this.deadlineLabel, this.name)) exhaustion = Math.min(3, exhaustion + 1);
+          showNotif('¡Llegas tarde!');
+          advance(this);
+        }
+        fireNotifs(this.notifs, this.notifFired);
+        return;
       }
       if (this.bgKey === 'colegio') this.carT = Math.min(1, this.carT + dt * 0.55);
       const sp = player.speed;
@@ -630,8 +670,7 @@ function makeScrollScene(cfg) {
 
       if (this.deadline && !this.deadlineFired && gameMin >= this.deadline) {
         this.deadlineFired = true;
-        addMissed(this.deadlineLabel, this.name);
-        exhaustion = Math.min(3, exhaustion + 1);
+        if (addMissed(this.deadlineLabel, this.name)) exhaustion = Math.min(3, exhaustion + 1);
         showNotif('¡Llegas tarde!');
         advance(this);
       }
@@ -657,13 +696,15 @@ function makeScrollScene(cfg) {
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(W / 2 - 160, H - 22, 320, 12);
       ctx.fillStyle = '#2ecc71'; ctx.fillRect(W / 2 - 160, H - 22, 320 * prog, 12);
 
-      if (this.bgKey === 'colegio') {
+      if (cfg.vehicle === 'car') {
+        drawCar(this.carX, H - 365, 560);
+      } else if (this.bgKey === 'colegio') {
         const carW = 560;
         const carX = W - 560 + (1 - this.carT) * 480;
         drawCar(carX, H - 365, carW);
       }
 
-      drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
+      if (cfg.vehicle !== 'car') drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
       drawHUD(this.name);
     }
   };
@@ -675,7 +716,7 @@ function makeSchoolDoorScene(cfg) {
     x: 640,
     y: GROUND,
     label: cfg.doorLabel || 'Entrar al colegio',
-    hitbox: { x: 820, y: 300, w: 310, h: 465 },
+    hitbox: { x: 845, y: 755, w: 280, h: 250 },
   });
 
   return {
@@ -686,41 +727,45 @@ function makeSchoolDoorScene(cfg) {
     notifs: cfg.notifs || [],
     notifFired: [],
     entered: false,
-    carX: W + 260,
-    carStopX: 1130,
+    carX: 80,
+    carStopX: 650,
     done: false,
-    hold: 0,
     door,
 
     update(dt) {
       if (!this.entered) {
         this.entered = true;
         this.bgKey = 'colegio';
-        this.carX = W + 260;
+        this.carX = 80;
         this.done = false;
-        this.hold = 0;
-        player.x = W - 360;
+        player.x = START_X;
         player.targetX = null;
         player.pendingHotspot = null;
       }
 
       if (!this.done) {
-        this.carX = Math.max(this.carStopX, this.carX - 360 * dt);
-        if (this.carX <= this.carStopX && pointer.clicked && this.door.isClicked(pointer.x, pointer.y)) {
+        const carSpeed = 470;
+        if (K['KeyA']) this.carX -= carSpeed * dt;
+        if (K['KeyD']) this.carX += carSpeed * dt;
+        this.carX = Math.max(40, Math.min(W - 600, this.carX));
+
+        const carAtDoor = Math.abs(this.carX - this.carStopX) < 180;
+        if (carAtDoor && pointer.clicked && this.door.isClicked(pointer.x, pointer.y)) {
           this.done = true;
           this.bgKey = 'colegio_puerta';
-          this.hold = 3.5;
           addDone(this.door.label, this.name);
           showNotif(cfg.doneText || 'La niña entra al colegio.');
         }
       } else {
-        this.hold -= dt;
-        if (this.hold <= 0) advance(this);
+        const carSpeed = 470;
+        if (K['KeyA']) this.carX -= carSpeed * dt;
+        if (K['KeyD']) this.carX += carSpeed * dt;
+        this.carX = Math.max(40, this.carX);
+        if (this.carX > W + EDGE_EXIT) advance(this);
       }
 
       if (this.deadline && !this.done && gameMin >= this.deadline) {
-        addMissed(this.deadlineLabel, this.name);
-        exhaustion = Math.min(3, exhaustion + 1);
+        if (addMissed(this.deadlineLabel, this.name)) exhaustion = Math.min(3, exhaustion + 1);
         showNotif('¡Llegas tarde!');
         advance(this);
       }
@@ -732,9 +777,9 @@ function makeSchoolDoorScene(cfg) {
         ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = '#7a8c5a'; ctx.fillRect(0, GROUND - 10, W, H);
       }
+      drawCar(this.carX, H - 365, 560);
       if (!this.done) {
-        drawCar(this.carX, H - 365, 560);
-        if (this.carX <= this.carStopX + 2) drawHotspots([this.door], this.door.x, this.door.y);
+        if (Math.abs(this.carX - this.carStopX) < 180) drawHotspots([this.door], this.door.x, this.door.y);
       }
       drawHUD(this.name);
     }
@@ -810,8 +855,7 @@ function makeOfficeScene() {
       if (this.deadline && !this.deadlineFired && gameMin >= this.deadline) {
         this.deadlineFired = true;
         if (!desk.done) {
-          addMissed(desk.label, this.name);
-          exhaustion = Math.min(3, exhaustion + 1);
+          if (addMissed(desk.label, this.name)) exhaustion = Math.min(3, exhaustion + 1);
         }
         advance(this);
       }
@@ -967,12 +1011,9 @@ function buildScenes() {
     // ── E2: Cocina 07:15 → deadline 08:15 ────────────────────────────────────
     makeStaticScene({
       name: 'Cocina — 07:15',
-      bgKey: 'cocina',
+      bgKey: 'cocina_desayuno_1',
       hotspots: [
-        { x: 600, y: GROUND, label: 'Tu desayuno', maxPresses: 1, hitboxes: [{ x: 575, y: 555, w: 245, h: 250 }, { x: 1010, y: 555, w: 245, h: 250 }] },
-        { x: 600, y: GROUND, label: 'Desayuno de la niña', maxPresses: 2, hitboxes: [{ x: 575, y: 555, w: 245, h: 250 }, { x: 1010, y: 555, w: 245, h: 250 }] },
-        { x: 600, y: GROUND, label: 'Mochila escolar', maxPresses: 2, hitboxes: [{ x: 575, y: 555, w: 245, h: 250 }, { x: 1010, y: 555, w: 245, h: 250 }] },
-        { x: 600, y: GROUND, label: 'Llamar a mamá (pastillas)', maxPresses: 1, hitboxes: [{ x: 575, y: 555, w: 245, h: 250 }, { x: 1010, y: 555, w: 245, h: 250 }] },
+        { x: 600, y: GROUND, label: 'Desayunar', maxPresses: 1, hitboxes: [{ x: 575, y: 555, w: 245, h: 250 }, { x: 1010, y: 555, w: 245, h: 250 }] },
         { x: 1140, y: GROUND, label: 'Salir', isExit: true },
       ],
       deadline: 495,
@@ -999,6 +1040,7 @@ function buildScenes() {
     makeScrollScene({
       name: 'Camino al trabajo — 08:30',
       bgKey: 'calle', endX: 2200,
+      vehicle: 'car',
       deadline: 540, deadlineLabel: 'Llegar al trabajo a tiempo',
       notifs: [{ time: 518, text: 'El bus sale en 2 minutos.' }]
     }),
@@ -1118,8 +1160,7 @@ function buildScenes() {
         if (gameMin >= this.waitUntil) {
           if (!this._lateMissed) {
             this._lateMissed = true;
-            addMissed('Recoger a la niña de extraescolares', this.name);
-            exhaustion = Math.min(3, exhaustion + 1);
+            if (addMissed('Recoger a la niña de extraescolares', this.name)) exhaustion = Math.min(3, exhaustion + 1);
           }
           gotoScene(scenes.indexOf(this) + 1);
         }
@@ -1375,7 +1416,7 @@ function resetGame() {
   notif = null;
   player.x = START_X; player.targetX = null; player.pendingHotspot = null; player.dir = 1; player.walkT = 0; player.moving = false;
   nextPlayerX = START_X;
-  fadeAlpha = 0; fadeDir = 0;
+  fadeAlpha = 0; fadeDir = 0; loadingTimer = 0;
   titleScreen.timer = 0;
   summaryScreen.timer = 0;
   buildScenes();
@@ -1403,15 +1444,20 @@ function loop(t) {
     }
   }
 
-  // Fade
+  // Loading transition
   if (fadeDir === -1) {
     fadeAlpha += FADE_SPEED * dt;
     if (fadeAlpha >= 1) {
-      fadeAlpha = 1; fadeDir = 1;
+      fadeAlpha = 1;
       currentScene = nextScene;
       player.x = nextPlayerX; player.targetX = null; player.pendingHotspot = null; player.dir = 1; player.walkT = 0; player.moving = false;
-      if (window.GameUI) window.GameUI.fadeFromBlack();
+      loadingTimer = LOADING_BLACK_TIME;
+      fadeDir = 2;
     }
+  } else if (fadeDir === 2) {
+    fadeAlpha = 1;
+    loadingTimer -= dt;
+    if (loadingTimer <= 0) fadeDir = 1;
   } else if (fadeDir === 1) {
     fadeAlpha -= FADE_SPEED * dt;
     if (fadeAlpha <= 0) { fadeAlpha = 0; fadeDir = 0; }
@@ -1422,7 +1468,7 @@ function loop(t) {
   const sc = scenes[currentScene];
   if (sc) {
     syncUI(sc.name);
-    sc.update(dt);
+    if (fadeDir === 0) sc.update(dt);
     sc.draw();
   }
 
@@ -1440,10 +1486,11 @@ function loop(t) {
 async function init() {
   await Promise.all([
     loadImg('cocina',            'assets/img/fondos/cocina.png'),
+    loadImg('cocina_desayuno_1', 'assets/img/fondos/cocinaDesayuno1.png'),
     loadImg('cocina_desayuno_2', 'assets/img/fondos/cocinaDesayuno2.png'),
     loadImg('calle',             'assets/img/fondos/calle.png'),
     loadImg('colegio',           'assets/img/fondos/colegio.png'),
-    loadImg('colegio_puerta',    'assets/img/fondos/colegioNiñosPuerta.png'),
+    loadImg('colegio_puerta',    'assets/img/fondos/colegioNinosPuerta.png'),
     loadImg('casa_abuela',       'assets/img/fondos/casa abuela.png'),
     loadImg('hospital',          'assets/img/fondos/hospital.png'),
     loadImg('habitacion',        'assets/img/fondos/habitacion.png'),
