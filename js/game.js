@@ -6,13 +6,16 @@ const GROUND = H - 165;
 const START_X = 300;
 const EDGE_EXIT = 70;
 const HOTSPOT_COORD_W = 1280;
+const PLAYER_H = 560;
+const WALK_ANIM_FPS = 8;
+const WALK_FRAMES = ['madre_walk_1', 'madre_side', 'madre_walk_2', 'madre_side'];
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 canvas.width = W; canvas.height = H;
 
 function resize() {
-  const s = Math.min(window.innerWidth / W, window.innerHeight / H);
+  const s = Math.max(window.innerWidth / W, window.innerHeight / H);
   canvas.style.width  = (W * s) + 'px';
   canvas.style.height = (H * s) + 'px';
 }
@@ -23,6 +26,7 @@ resize();
 const K = {}, P = {};
 const pointer = { x: 0, y: 0, pressed: false, clicked: false };
 window.addEventListener('keydown', e => {
+  if (e.code !== 'KeyA' && e.code !== 'KeyD') return;
   if (!K[e.code]) P[e.code] = true;
   K[e.code] = true;
   e.preventDefault();
@@ -52,7 +56,8 @@ function loadImg(id, src) {
 }
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
-const SPEED_TBL = [220, 175, 130, 90];
+const SPEED_TBL = [340, 280, 220, 160];
+const FADE_SPEED = 3.8;
 let gameMin    = 420;
 let exhaustion = 0;
 let missedTasks     = [];
@@ -60,12 +65,14 @@ let completedTasks  = [];
 let notif      = null;   // { text, timer }
 let currentScene = 0;
 let nextScene    = 0;
+let nextPlayerX  = START_X;
 let fadeAlpha    = 0;
 let fadeDir      = 0;    // -1 fade-out → 1 fade-in → 0 done
 
 const player = {
   x: START_X, y: GROUND,
   targetX: null,
+  pendingHotspot: null,
   dir: 1, walkT: 0, moving: false,
   get speed() { return SPEED_TBL[exhaustion]; }
 };
@@ -77,12 +84,28 @@ function fmtTime(m) {
   return String(h).padStart(2,'0') + ':' + String(mn).padStart(2,'0');
 }
 
-function showNotif(text) { notif = { text, timer: 4 }; }
+function syncUI(sceneName) {
+  if (!window.GameUI) return;
+  window.GameUI.setTitleActive(currentScene === 0);
+  window.GameUI.setScene(sceneName);
+  window.GameUI.setClock(fmtTime(gameMin));
+  window.GameUI.setTasks({
+    completed: completedTasks.length,
+    missed: missedTasks.length,
+  });
+}
 
-function gotoScene(idx) {
+function showNotif(text) {
+  notif = { text, timer: 4 };
+  if (window.GameUI) window.GameUI.setNotification(text);
+}
+
+function gotoScene(idx, startX = START_X) {
   nextScene = idx;
+  nextPlayerX = startX;
   fadeDir   = -1;
   fadeAlpha = 0;
+  if (window.GameUI) window.GameUI.fadeToBlack();
 }
 
 function addMissed(label, scene) {
@@ -117,6 +140,47 @@ function drawBgImage(key, scrollX) {
   return true;
 }
 
+function drawImageCentered(key, x, y, maxW, maxH) {
+  const img = IMG[key];
+  if (!img) return false;
+  const s = Math.min(maxW / img.width, maxH / img.height);
+  const w = img.width * s;
+  const h = img.height * s;
+  ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+  return true;
+}
+
+function drawImageCrop(key, sx, sy, sw, sh, x, y, w, h) {
+  const img = IMG[key];
+  if (!img) return false;
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  return true;
+}
+
+function drawSpriteGrounded(key, x, groundY, maxH) {
+  const img = IMG[key];
+  if (!img) return false;
+  const h = maxH;
+  const w = img.width * (h / img.height);
+  ctx.drawImage(img, x - w / 2, groundY - h, w, h);
+  return true;
+}
+
+function drawSceneObjects(objects = []) {
+  objects.forEach(obj => {
+    if (obj.crop) {
+      drawImageCrop(obj.key, obj.crop.x, obj.crop.y, obj.crop.w, obj.crop.h, obj.x, obj.y, obj.w, obj.h);
+    } else {
+      drawImageCentered(obj.key, obj.x, obj.y, obj.w, obj.h);
+    }
+  });
+}
+
+function drawCar(x, y, w) {
+  const h = w * 0.58;
+  return drawImageCrop('coche', 420, 160, 1080, 760, x, y, w, h);
+}
+
 function drawRoomBg(wallCol, floorCol, baseboardCol) {
   ctx.fillStyle = floorCol || '#7a6050';
   ctx.fillRect(0, GROUND - 10, W, H - GROUND + 10);
@@ -128,6 +192,22 @@ function drawRoomBg(wallCol, floorCol, baseboardCol) {
 
 // ─── PLAYER DRAWING ──────────────────────────────────────────────────────────
 function drawPlayer(px, py, dir, wt, exh, moving) {
+  const spriteKey = moving
+    ? WALK_FRAMES[Math.floor(wt * WALK_ANIM_FPS) % WALK_FRAMES.length]
+    : 'madre_side';
+  const sprite = IMG[spriteKey] || IMG['madre_side'];
+  if (sprite) {
+    const h = PLAYER_H;
+    const w = sprite.width * (h / sprite.height);
+    ctx.save();
+    ctx.translate(px, py);
+    if (dir < 0) ctx.scale(-1, 1);
+    ctx.globalAlpha = 1 - Math.min(0.18, exh * 0.04);
+    ctx.drawImage(sprite, -w / 2, -h, w, h);
+    ctx.restore();
+    return;
+  }
+
   ctx.save();
   ctx.translate(px, py);
   if (dir < 0) ctx.scale(-1, 1);
@@ -188,6 +268,8 @@ function drawPlayer(px, py, dir, wt, exh, moving) {
 
 // ─── HUD ─────────────────────────────────────────────────────────────────────
 function drawHUD(sceneName) {
+  if (window.GameUI) return;
+
   // Clock — top right
   if (IMG['clock']) {
     ctx.drawImage(IMG['clock'], W - 185, 8, 178, 58);
@@ -252,19 +334,31 @@ function drawHUD(sceneName) {
   // Controls hint — bottom center
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('A / D mover   clic caminar/interactuar   E / Espacio interactuar', W / 2, H - 6);
+  ctx.fillText('A / D para moverte   clic para interactuar', W / 2, H - 6);
 }
 
 // ─── HOTSPOT ─────────────────────────────────────────────────────────────────
 class Hotspot {
-  constructor({ x, y, label, maxPresses = 1, depends = null, isExit = false }) {
+  constructor({ x, y, label, maxPresses = 1, depends = null, isExit = false, imgKey = null, hitbox = null, hitboxes = null }) {
     this.x = x * (W / HOTSPOT_COORD_W); this.y = y; this.label = label;
     this.maxPresses = maxPresses; this.progress = 0; this.done = false;
     this.depends = depends; this.isExit = isExit;
+    this.imgKey = imgKey;
+    this.hitbox = hitbox;
+    this.hitboxes = hitboxes;
     this.r = 38;
   }
   isNear(px, py) { return Math.abs(px - this.x) < 85 && Math.abs(py - this.y) < 80; }
-  isClicked(x, y) { return Math.hypot(x - this.x, y - this.y) <= this.r + 24; }
+  isClicked(x, y) {
+    if (this.hitboxes) {
+      return this.hitboxes.some(box => x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h);
+    }
+    if (this.hitbox) {
+      return x >= this.hitbox.x && x <= this.hitbox.x + this.hitbox.w
+        && y >= this.hitbox.y && y <= this.hitbox.y + this.hitbox.h;
+    }
+    return Math.hypot(x - this.x, y - this.y) <= this.r + 24;
+  }
   interact(all) {
     if (this.done) return false;
     if (this.depends) {
@@ -280,12 +374,10 @@ function drawHotspots(hotspots, px, py) {
   hotspots.forEach(hs => {
     if (hs.done) return;
     const near = hs.isNear(px, py);
-    ctx.beginPath(); ctx.arc(hs.x, hs.y, hs.r, 0, Math.PI * 2);
-    ctx.fillStyle = near ? 'rgba(255,230,80,0.3)' : 'rgba(255,255,255,0.12)';
-    ctx.fill();
-    ctx.strokeStyle = near ? '#f1c40f' : 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 2.5; ctx.stroke();
-    if (hs.maxPresses > 1) {
+    if (hs.imgKey && !hs.hitbox) {
+      drawImageCentered(hs.imgKey, hs.x, hs.y - 62, 120, 120);
+    }
+    if (near && hs.maxPresses > 1) {
       ctx.fillStyle = '#f1c40f'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(hs.progress + '/' + hs.maxPresses, hs.x, hs.y + hs.r + 18);
     }
@@ -295,7 +387,7 @@ function drawHotspots(hotspots, px, py) {
       ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(hs.label, hs.x, hs.y - hs.r - 17);
       ctx.fillStyle = '#f1c40f'; ctx.font = '12px sans-serif';
-      ctx.fillText('[E] Interactuar', hs.x, hs.y + hs.r + 34);
+      ctx.fillText('Clic para interactuar', hs.x, hs.y + hs.r + 34);
     }
   });
 }
@@ -304,14 +396,17 @@ function drawHotspots(hotspots, px, py) {
 function movePlayer(dt, opts = {}) {
   const sp = player.speed;
   player.moving = false;
-  const keyboardMoving = K['ArrowLeft'] || K['KeyA'] || K['ArrowRight'] || K['KeyD'];
-  if (keyboardMoving) player.targetX = null;
+  const keyboardMoving = K['KeyA'] || K['KeyD'];
+  if (keyboardMoving) {
+    player.targetX = null;
+    player.pendingHotspot = null;
+  }
 
-  if (K['ArrowLeft'] || K['KeyA']) {
+  if (K['KeyA']) {
     player.x -= sp * dt;
     player.dir = -1; player.moving = true;
   }
-  if (K['ArrowRight'] || K['KeyD']) {
+  if (K['KeyD']) {
     player.x += sp * dt;
     player.dir = 1; player.moving = true;
   }
@@ -326,32 +421,39 @@ function movePlayer(dt, opts = {}) {
       player.moving = true;
     }
   }
-  if (!opts.allowExit) player.x = Math.max(40, Math.min(W - 40, player.x));
+  const minX = opts.minX ?? 40;
+  const maxX = opts.maxX ?? (W - 40);
+  if (!opts.allowExit) player.x = Math.max(minX, Math.min(maxX, player.x));
   if (player.moving) player.walkT += dt;
 }
 
-function interactHotspots(hotspots, sceneName, onExit) {
+function interactHotspots(hotspots, sceneName, onExit, onDone) {
   const clickedHotspot = pointer.clicked
     ? hotspots.find(hs => !hs.done && hs.isClicked(pointer.x, pointer.y))
     : null;
-  if (pointer.clicked && !clickedHotspot && pointer.y > H * 0.45) {
-    player.targetX = Math.max(40, Math.min(W - 40, pointer.x));
-  }
-  if (!(P['KeyE'] || P['Space'] || clickedHotspot)) return;
   if (clickedHotspot && !clickedHotspot.isNear(player.x, player.y)) {
-    player.targetX = clickedHotspot.x;
+    player.targetX = Math.max(40, Math.min(W - 40, clickedHotspot.x));
+    player.pendingHotspot = clickedHotspot;
     return;
   }
+  const activeHotspot = clickedHotspot
+    || (player.pendingHotspot && !player.pendingHotspot.done && player.pendingHotspot.isNear(player.x, player.y)
+      ? player.pendingHotspot
+      : null);
+  if (!activeHotspot) return;
+
   for (const hs of hotspots) {
     if (hs.done) continue;
-    const selected = clickedHotspot === hs;
-    if (clickedHotspot && !selected) continue;
+    const selected = activeHotspot === hs;
+    if (!selected) continue;
     if (!selected && !hs.isNear(player.x, player.y)) continue;
     const ok = hs.interact(hotspots);
     if (ok && hs.done) {
       addDone(hs.label, sceneName);
+      if (onDone) onDone(hs);
       if (hs.isExit && onExit) onExit();
     }
+    player.pendingHotspot = null;
     break;
   }
 }
@@ -372,6 +474,34 @@ function missUndone(hotspots, sceneName) {
 }
 
 // ─── SCENE FACTORIES ─────────────────────────────────────────────────────────
+function tasksDone(hotspots = []) {
+  const required = hotspots.filter(hs => !hs.isExit);
+  return required.length === 0 || required.every(hs => hs.done);
+}
+
+function canLeaveForward(scene) {
+  return tasksDone(scene.hotspots) || scene.deadlineFired;
+}
+
+function tryLeaveForward(scene) {
+  if (canLeaveForward(scene)) {
+    advance(scene);
+    return true;
+  }
+  player.x = W - 40;
+  if (!notif || notif.text !== 'Termina las tareas antes de salir.') {
+    showNotif('Termina las tareas antes de salir.');
+  }
+  return false;
+}
+
+function goBack(scene) {
+  const i = scenes.indexOf(scene);
+  if (i <= 0) return false;
+  gotoScene(i - 1, W - START_X);
+  return true;
+}
+
 function makeStaticScene(cfg) {
   // cfg: { name, bgKey, wallCol, floorCol, hotspots[], deadline, notifs[], onEnter }
   const s = {
@@ -389,19 +519,20 @@ function makeStaticScene(cfg) {
     update(dt) {
       if (!this.entered) { this.entered = true; if (cfg.onEnter) cfg.onEnter(this); }
       movePlayer(dt, { allowExit: true });
-      interactHotspots(this.hotspots, this.name, () => advance(this));
+      interactHotspots(
+        this.hotspots,
+        this.name,
+        () => tryLeaveForward(this),
+        hs => { if (cfg.onHotspotDone) cfg.onHotspotDone(this, hs); }
+      );
       fireNotifs(this.notifs, this.notifFired);
-      if (player.x > W + EDGE_EXIT) {
-        advance(this);
+      if (player.x < -EDGE_EXIT) {
+        goBack(this);
         return;
       }
-
-      // Auto-advance if all done and no exit hotspot
-      if (!this.hotspots.some(h => h.isExit)) {
-        if (this.hotspots.every(h => h.done) && !this.deadlineFired) {
-          this.deadlineFired = true;
-          advance(this);
-        }
+      if (player.x > W + EDGE_EXIT) {
+        tryLeaveForward(this);
+        return;
       }
 
       // Deadline
@@ -415,6 +546,7 @@ function makeStaticScene(cfg) {
 
     draw() {
       if (!drawBgImage(this.bgKey)) drawRoomBg(this.wallCol, this.floorCol);
+      drawSceneObjects(cfg.objects);
       drawHotspots(this.hotspots, player.x, player.y);
       drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
       drawHUD(this.name);
@@ -437,29 +569,33 @@ function makeScrollScene(cfg) {
     entered: false,
     scrollX: 0,
     maxScroll: 0,
+    carT: 0,
 
     update(dt) {
       if (!this.entered) {
         this.entered = true;
         this.scrollX = 0;
+        this.carT = 0;
         this.maxScroll = Math.max(0, (IMG[this.bgKey]?.width || W) - W);
         player.x = START_X;
         player.targetX = null;
+        player.pendingHotspot = null;
         if (cfg.onEnter) cfg.onEnter(this);
       }
+      if (this.bgKey === 'colegio') this.carT = Math.min(1, this.carT + dt * 0.55);
       const sp = player.speed;
       player.moving = false;
-      const keyboardMoving = K['ArrowLeft'] || K['KeyA'] || K['ArrowRight'] || K['KeyD'];
-      if (keyboardMoving) player.targetX = null;
-      if (pointer.clicked && pointer.y > H * 0.45) {
-        player.targetX = Math.max(40, Math.min(W - 40, pointer.x));
+      const keyboardMoving = K['KeyA'] || K['KeyD'];
+      if (keyboardMoving) {
+        player.targetX = null;
+        player.pendingHotspot = null;
       }
-      if (K['ArrowLeft'] || K['KeyA']) {
+      if (K['KeyA']) {
         if (this.scrollX > 0) this.scrollX = Math.max(0, this.scrollX - sp * dt);
-        else player.x = Math.max(40, player.x - sp * dt);
+        else player.x -= sp * dt;
         player.dir = -1; player.moving = true;
       }
-      if (K['ArrowRight'] || K['KeyD']) {
+      if (K['KeyD']) {
         if (player.x < W * 0.58) player.x = Math.min(W * 0.58, player.x + sp * dt);
         else if (this.scrollX < this.maxScroll) this.scrollX = Math.min(this.maxScroll, this.scrollX + sp * dt);
         else player.x += sp * dt;
@@ -483,8 +619,12 @@ function makeScrollScene(cfg) {
       }
       if (player.moving) player.walkT += dt;
 
+      if (player.x < -EDGE_EXIT && this.scrollX <= 0) {
+        goBack(this);
+        return;
+      }
       if (player.x > W + EDGE_EXIT || (this.maxScroll > 0 && this.scrollX >= this.maxScroll && player.x > W - 60)) {
-        advance(this);
+        tryLeaveForward(this);
         return;
       }
 
@@ -517,11 +657,177 @@ function makeScrollScene(cfg) {
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(W / 2 - 160, H - 22, 320, 12);
       ctx.fillStyle = '#2ecc71'; ctx.fillRect(W / 2 - 160, H - 22, 320 * prog, 12);
 
+      if (this.bgKey === 'colegio') {
+        const carW = 560;
+        const carX = W - 560 + (1 - this.carT) * 480;
+        drawCar(carX, H - 365, carW);
+      }
+
       drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
       drawHUD(this.name);
     }
   };
   return s;
+}
+
+function makeSchoolDoorScene(cfg) {
+  const door = new Hotspot({
+    x: 640,
+    y: GROUND,
+    label: cfg.doorLabel || 'Entrar al colegio',
+    hitbox: { x: 820, y: 300, w: 310, h: 465 },
+  });
+
+  return {
+    name: cfg.name,
+    bgKey: 'colegio',
+    deadline: cfg.deadline || null,
+    deadlineLabel: cfg.deadlineLabel || cfg.name,
+    notifs: cfg.notifs || [],
+    notifFired: [],
+    entered: false,
+    carX: W + 260,
+    carStopX: 1130,
+    done: false,
+    hold: 0,
+    door,
+
+    update(dt) {
+      if (!this.entered) {
+        this.entered = true;
+        this.bgKey = 'colegio';
+        this.carX = W + 260;
+        this.done = false;
+        this.hold = 0;
+        player.x = W - 360;
+        player.targetX = null;
+        player.pendingHotspot = null;
+      }
+
+      if (!this.done) {
+        this.carX = Math.max(this.carStopX, this.carX - 360 * dt);
+        if (this.carX <= this.carStopX && pointer.clicked && this.door.isClicked(pointer.x, pointer.y)) {
+          this.done = true;
+          this.bgKey = 'colegio_puerta';
+          this.hold = 3.5;
+          addDone(this.door.label, this.name);
+          showNotif(cfg.doneText || 'La niña entra al colegio.');
+        }
+      } else {
+        this.hold -= dt;
+        if (this.hold <= 0) advance(this);
+      }
+
+      if (this.deadline && !this.done && gameMin >= this.deadline) {
+        addMissed(this.deadlineLabel, this.name);
+        exhaustion = Math.min(3, exhaustion + 1);
+        showNotif('¡Llegas tarde!');
+        advance(this);
+      }
+      fireNotifs(this.notifs, this.notifFired);
+    },
+
+    draw() {
+      if (!drawBgImage(this.bgKey)) {
+        ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#7a8c5a'; ctx.fillRect(0, GROUND - 10, W, H);
+      }
+      if (!this.done) {
+        drawCar(this.carX, H - 365, 560);
+        if (this.carX <= this.carStopX + 2) drawHotspots([this.door], this.door.x, this.door.y);
+      }
+      drawHUD(this.name);
+    }
+  };
+}
+
+function makeOfficeScene() {
+  const desk = new Hotspot({
+    x: 940,
+    y: GROUND,
+    label: 'Trabajar en el escritorio',
+    maxPresses: 5,
+    hitbox: { x: 1110, y: 455, w: 680, h: 400 },
+  });
+
+  return {
+    name: 'Oficina — 09:00',
+    bgKey: 'oficina_vacia',
+    entered: false,
+    deadline: 840,
+    deadlineFired: false,
+    notifs: [
+      { time: 600, text: 'Tu madre llama. No puedes coger el teléfono.' },
+      { time: 660, text: 'Mensaje del colegio: "Tu hija no se encuentra bien."' },
+      { time: 720, text: 'Tu madre vuelve a llamar. Tercera vez hoy.' },
+      { time: 790, text: 'Jefa: "¿Tienes listo el informe?"' },
+      { time: 820, text: 'Son las 13:40. Debes salir en 20 minutos para recoger a la niña.' },
+    ],
+    notifFired: [],
+    hotspots: [desk],
+    seatedTimer: 0,
+
+    update(dt) {
+      if (!this.entered) {
+        this.entered = true;
+        this.bgKey = 'oficina_vacia';
+        player.x = W - 260;
+        player.targetX = null;
+        player.pendingHotspot = null;
+        showNotif('Llegas a la oficina.');
+      }
+
+      if (this.seatedTimer > 0) {
+        this.seatedTimer -= dt;
+        if (this.seatedTimer <= 0) {
+          this.bgKey = 'oficina_vacia';
+          player.x = W - 260;
+          showNotif('Vuelves a levantarte.');
+        }
+      } else {
+        movePlayer(dt, { minX: W * 0.66, maxX: W - 40 });
+        if (pointer.clicked && !desk.done && desk.isClicked(pointer.x, pointer.y) && !desk.isNear(player.x, player.y)) {
+          player.targetX = Math.max(W * 0.66, Math.min(W - 40, desk.x));
+          player.pendingHotspot = desk;
+        }
+        const deskReady = !desk.done && (
+          (pointer.clicked && desk.isClicked(pointer.x, pointer.y) && desk.isNear(player.x, player.y))
+          || (player.pendingHotspot === desk && desk.isNear(player.x, player.y))
+        );
+        if (deskReady) {
+          const ok = desk.interact(this.hotspots);
+          if (ok) {
+            this.bgKey = 'oficina_sentada';
+            this.seatedTimer = 7;
+            player.pendingHotspot = null;
+            if (desk.done) addDone(desk.label, this.name);
+          }
+        }
+      }
+
+      fireNotifs(this.notifs, this.notifFired);
+
+      if (this.deadline && !this.deadlineFired && gameMin >= this.deadline) {
+        this.deadlineFired = true;
+        if (!desk.done) {
+          addMissed(desk.label, this.name);
+          exhaustion = Math.min(3, exhaustion + 1);
+        }
+        advance(this);
+      }
+    },
+
+    draw() {
+      if (!drawBgImage(this.bgKey)) drawRoomBg('#cfd8dc', '#6a808c');
+      if (this.seatedTimer <= 0) {
+        drawHotspots(this.hotspots, player.x, player.y);
+        drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
+      } else {
+        drawSpriteGrounded('madre_sitting', W - 380, GROUND + 8, 320);
+      }
+      drawHUD(this.name);
+    }
+  };
 }
 
 function advance(scene) {
@@ -535,34 +841,38 @@ const titleScreen = {
   timer: 0,
   update(dt) {
     this.timer += dt;
-    if (P['Space'] || P['Enter'] || (this.timer > 1.5 && P['KeyE'])) gotoScene(1);
+    if (pointer.clicked) gotoScene(1);
   },
   draw() {
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#12112a'); g.addColorStop(0.55, '#c97b4b'); g.addColorStop(1, '#2c1408');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, W, H);
 
-    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 24;
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 100px serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#d9d9d9';
+    ctx.fillRect(170, 250, 620, 430);
+
+    ctx.save();
+    ctx.translate(20, 0);
+    ctx.shadowColor = 'rgba(0,0,0,0.12)'; ctx.shadowBlur = 18;
+    ctx.fillStyle = '#1f1f1f'; ctx.font = 'bold 100px serif'; ctx.textAlign = 'left';
     ctx.fillText('EMPATÍA', W / 2, H / 2 - 70);
     ctx.shadowBlur = 0;
 
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.fillStyle = 'rgba(31,31,31,0.78)';
     ctx.font = '22px sans-serif';
     ctx.fillText('Un día en la vida de Luisa', W / 2, H / 2 - 10);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillStyle = 'rgba(31,31,31,0.58)';
     ctx.font = '16px sans-serif';
     ctx.fillText('Un juego sobre el peso invisible del cuidado', W / 2, H / 2 + 28);
 
     if (Math.floor(this.timer * 2) % 2 === 0) {
-      ctx.fillStyle = '#f1c40f'; ctx.font = '20px sans-serif';
-      ctx.fillText('Pulsa ESPACIO para comenzar', W / 2, H - 72);
+      ctx.fillStyle = '#c28a06'; ctx.font = '20px sans-serif';
+      ctx.fillText('Haz clic para comenzar', W / 2, H / 2 + 54);
     }
 
-    drawPlayer(W / 2, H - 155, 1, this.timer * 0.8, 0, false);
+    ctx.restore();
 
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '13px sans-serif';
+    ctx.fillStyle = 'rgba(31,31,31,0.38)'; ctx.font = '13px sans-serif'; ctx.textAlign = 'left';
     ctx.fillText('Diseñado por Sandra Martínez y Beatriz Montes · ESD Madrid', W / 2, H - 18);
   }
 };
@@ -573,7 +883,7 @@ const summaryScreen = {
   timer: 0,
   update(dt) {
     this.timer += dt;
-    if (this.timer > 3 && (P['Space'] || P['KeyR'] || P['Enter'])) resetGame();
+    if (this.timer > 3 && pointer.clicked) resetGame();
   },
   draw() {
     ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, W, H);
@@ -616,7 +926,7 @@ const summaryScreen = {
 
     if (this.timer > 3) {
       ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '17px sans-serif';
-      ctx.fillText('Pulsa R para volver al inicio', W / 2, H - 30);
+      ctx.fillText('Haz clic para volver al inicio', W / 2, H - 30);
     }
   }
 };
@@ -633,11 +943,21 @@ function buildScenes() {
     // ── E1: Dormitorio 07:00 → deadline 07:17 ────────────────────────────────
     makeStaticScene({
       name: 'Dormitorio — 07:00',
+      bgKey: 'habitacion',
       wallCol: '#c0a898', floorCol: '#6a5040',
+      objects: [
+        {
+          key: 'clock',
+          crop: { x: 430, y: 245, w: 1160, h: 610 },
+          x: 895,
+          y: 505,
+          w: 160,
+          h: 84,
+        },
+      ],
       hotspots: [
-        { x: 320, y: GROUND, label: 'Apagar la alarma' },
-        { x: 600, y: GROUND, label: 'Vestirse', maxPresses: 2 },
-        { x: 920, y: GROUND, label: 'Aseo básico' },
+        { x: 600, y: GROUND, label: 'Apagar la alarma', hitbox: { x: 810, y: 440, w: 190, h: 150 } },
+        { x: 1110, y: GROUND, label: 'Vestirse', maxPresses: 2, hitbox: { x: 1480, y: 145, w: 360, h: 650 } },
       ],
       deadline: 437,
       notifs: [{ time: 421, text: 'La alarma suena. Otro día comienza.' }],
@@ -649,10 +969,10 @@ function buildScenes() {
       name: 'Cocina — 07:15',
       bgKey: 'cocina',
       hotspots: [
-        { x: 220, y: GROUND, label: 'Tu desayuno', maxPresses: 1 },
-        { x: 460, y: GROUND, label: 'Desayuno de la niña', maxPresses: 2 },
-        { x: 700, y: GROUND, label: 'Mochila escolar', maxPresses: 2 },
-        { x: 950, y: GROUND, label: 'Llamar a mamá (pastillas)', maxPresses: 1 },
+        { x: 600, y: GROUND, label: 'Tu desayuno', maxPresses: 1, hitboxes: [{ x: 575, y: 555, w: 245, h: 250 }, { x: 1010, y: 555, w: 245, h: 250 }] },
+        { x: 600, y: GROUND, label: 'Desayuno de la niña', maxPresses: 2, hitboxes: [{ x: 575, y: 555, w: 245, h: 250 }, { x: 1010, y: 555, w: 245, h: 250 }] },
+        { x: 600, y: GROUND, label: 'Mochila escolar', maxPresses: 2, hitboxes: [{ x: 575, y: 555, w: 245, h: 250 }, { x: 1010, y: 555, w: 245, h: 250 }] },
+        { x: 600, y: GROUND, label: 'Llamar a mamá (pastillas)', maxPresses: 1, hitboxes: [{ x: 575, y: 555, w: 245, h: 250 }, { x: 1010, y: 555, w: 245, h: 250 }] },
         { x: 1140, y: GROUND, label: 'Salir', isExit: true },
       ],
       deadline: 495,
@@ -660,13 +980,17 @@ function buildScenes() {
         { time: 432, text: 'La niña no quiere comer. "¡Come algo!"' },
         { time: 460, text: 'Mensaje de tu madre: "¿Cuándo vienes hoy?"' },
         { time: 480, text: 'Tu jefa: "¿Puedes revisar el informe antes de las 9?"' },
-      ]
+      ],
+      onHotspotDone(scene, hs) {
+        if (!hs.isExit) scene.bgKey = 'cocina_desayuno_2';
+      }
     }),
 
     // ── E3: Camino al colegio scroll 08:15 → deadline 08:30 ──────────────────
-    makeScrollScene({
+    makeSchoolDoorScene({
       name: 'Camino al colegio — 08:15',
-      bgKey: 'colegio', endX: 1800,
+      doorLabel: 'Entrar al colegio',
+      doneText: 'La niña entra al colegio.',
       deadline: 510, deadlineLabel: 'Llegar al colegio a tiempo',
       notifs: [{ time: 500, text: 'La niña camina despacio. Llegaréis tarde.' }]
     }),
@@ -680,30 +1004,13 @@ function buildScenes() {
     }),
 
     // ── E5: Oficina 09:00 → forzado a las 14:00 ──────────────────────────────
-    makeStaticScene({
-      name: 'Oficina — 09:00',
-      wallCol: '#cfd8dc', floorCol: '#6a808c',
-      hotspots: [
-        { x: 200, y: GROUND, label: 'Revisar correos', maxPresses: 3 },
-        { x: 450, y: GROUND, label: 'Reunión de equipo', maxPresses: 4 },
-        { x: 700, y: GROUND, label: 'Informe mensual', maxPresses: 5 },
-        { x: 950, y: GROUND, label: 'Llamada con cliente', maxPresses: 2 },
-        { x: 1150, y: GROUND, label: 'Comer algo', maxPresses: 1 },
-      ],
-      deadline: 840,
-      notifs: [
-        { time: 600, text: 'Tu madre llama. No puedes coger el teléfono.' },
-        { time: 660, text: 'Mensaje del colegio: "Tu hija no se encuentra bien."' },
-        { time: 720, text: 'Tu madre vuelve a llamar. Tercera vez hoy.' },
-        { time: 790, text: 'Jefa: "¿Tienes listo el informe?"' },
-        { time: 820, text: 'Son las 13:40. Debes salir en 20 minutos para recoger a la niña.' },
-      ]
-    }),
+    makeOfficeScene(),
 
     // ── E6: Recoger a la niña scroll 14:00 → deadline 14:30 ──────────────────
-    makeScrollScene({
+    makeSchoolDoorScene({
       name: 'Recoger a la niña — 14:00',
-      bgKey: 'colegio', endX: 1600,
+      doorLabel: 'Recoger a la niña',
+      doneText: 'La niña te espera en la puerta.',
       deadline: 870, deadlineLabel: 'Recoger a la niña a tiempo',
       notifs: [{ time: 848, text: 'Las 14:08. Las otras madres ya se han ido.' }]
     }),
@@ -713,10 +1020,10 @@ function buildScenes() {
       name: 'Cocina — 14:30',
       bgKey: 'cocina',
       hotspots: [
-        { x: 250, y: GROUND, label: 'Preparar la comida', maxPresses: 3 },
-        { x: 520, y: GROUND, label: 'Comer con la niña', maxPresses: 1 },
-        { x: 780, y: GROUND, label: 'Recoger la cocina', maxPresses: 2 },
-        { x: 1010, y: GROUND, label: 'Buscar pastillas de mamá', maxPresses: 1 },
+        { x: 600, y: GROUND, label: 'Preparar la comida', maxPresses: 3, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
+        { x: 600, y: GROUND, label: 'Comer con la niña', maxPresses: 1, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
+        { x: 600, y: GROUND, label: 'Recoger la cocina', maxPresses: 2, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
+        { x: 600, y: GROUND, label: 'Buscar pastillas de mamá', maxPresses: 1, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
         { x: 1160, y: GROUND, label: 'Salir', isExit: true },
       ],
       deadline: 930,
@@ -760,9 +1067,7 @@ function buildScenes() {
       entered: false,
       waitUntil: 1065,
       hotspots: [
-        new Hotspot({ x: 280, y: GROUND, label: 'Sentarse a esperar' }),
-        new Hotspot({ x: 620, y: GROUND, label: 'Hablar con la enfermera' }),
-        new Hotspot({ x: 980, y: GROUND, label: 'Responder mensajes', maxPresses: 3 }),
+        new Hotspot({ x: 640, y: GROUND, label: 'Entrar a consulta', hitbox: { x: 825, y: 255, w: 290, h: 520 } }),
       ],
       notifs: [
         { time: 1005, text: 'Lleváis media hora esperando.' },
@@ -772,14 +1077,42 @@ function buildScenes() {
       ],
       notifFired: [],
       _lateMissed: false,
+      _consulting: false,
+      _doorDone: false,
+      _internalFade: 0,
+      _fadeDir: 0,
 
       update(dt) {
         if (!this.entered) {
           this.entered = true;
-          showNotif('Sala de espera. No hay más remedio que esperar.');
+          this.bgKey = 'hospital_interior';
+          this._consulting = false;
+          this._doorDone = false;
+          this._internalFade = 0;
+          this._fadeDir = 0;
+          showNotif('Sala de espera. Entra cuando os llamen.');
         }
-        movePlayer(dt);
-        interactHotspots(this.hotspots, this.name, null);
+        if (!this._consulting) {
+          movePlayer(dt);
+          interactHotspots(this.hotspots, this.name, null, hs => {
+            if (hs.label === 'Entrar a consulta') {
+              this._doorDone = true;
+              this._fadeDir = 1;
+              showNotif('Entráis a consulta.');
+            }
+          });
+        }
+        if (this._fadeDir === 1) {
+          this._internalFade = Math.min(1, this._internalFade + dt * FADE_SPEED);
+          if (this._internalFade >= 1) {
+            this._fadeDir = -1;
+            this._consulting = true;
+            this.bgKey = 'hospital_madre_sentada';
+          }
+        } else if (this._fadeDir === -1) {
+          this._internalFade = Math.max(0, this._internalFade - dt * FADE_SPEED);
+          if (this._internalFade <= 0) this._fadeDir = 0;
+        }
         fireNotifs(this.notifs, this.notifFired);
 
         if (gameMin >= this.waitUntil) {
@@ -812,7 +1145,13 @@ function buildScenes() {
         ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(W / 2 - 160, H - 28, 320, 12);
         ctx.fillStyle = '#3498db'; ctx.fillRect(W / 2 - 160, H - 28, 320 * prog, 12);
 
-        drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
+        if (!this._consulting && !this._doorDone) {
+          drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
+        }
+        if (this._internalFade > 0) {
+          ctx.fillStyle = `rgba(0,0,0,${this._internalFade})`;
+          ctx.fillRect(0, 0, W, H);
+        }
         drawHUD(this.name);
       }
     },
@@ -862,7 +1201,7 @@ function buildScenes() {
       deadline: 1260,
       deadlineFired: false,
       hotspots: [
-        new Hotspot({ x: 160, y: GROUND, label: 'Hacer la cena', maxPresses: 4 }),
+        new Hotspot({ x: 160, y: GROUND, label: 'Hacer la cena', maxPresses: 4, imgKey: 'cena' }),
         new Hotspot({ x: 420, y: GROUND, label: 'Deberes con la niña', maxPresses: 3 }),
         new Hotspot({ x: 680, y: GROUND, label: 'Llamar a mamá (noche)', maxPresses: 1 }),
         new Hotspot({ x: 920, y: GROUND, label: 'Poner lavadora' }),
@@ -998,16 +1337,12 @@ function buildScenes() {
 
       draw() {
         const dark = Math.min(1, this._t / 5);
-        const r = Math.floor(40 - dark * 30), gv = Math.floor(28 - dark * 20), b = Math.floor(55 - dark * 42);
-        drawRoomBg(`rgb(${r},${gv},${b})`, '#14101e', '#1a1428');
-
-        // Bed
-        ctx.fillStyle = '#2a1a3e';
-        ctx.fillRect(W / 2 - 160, GROUND - 65, 320, 65);
-        ctx.fillStyle = '#3c2850';
-        ctx.fillRect(W / 2 - 160, GROUND - 88, 320, 26);
-        ctx.fillStyle = '#f0e8e0';
-        ctx.fillRect(W / 2 - 140, GROUND - 62, 100, 58);
+        if (!drawBgImage('habitacion')) {
+          const r = Math.floor(40 - dark * 30), gv = Math.floor(28 - dark * 20), b = Math.floor(55 - dark * 42);
+          drawRoomBg(`rgb(${r},${gv},${b})`, '#14101e', '#1a1428');
+        }
+        ctx.fillStyle = `rgba(0,0,0,${dark * 0.45})`;
+        ctx.fillRect(0, 0, W, H);
 
         if (this._t < 4) {
           drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
@@ -1038,7 +1373,8 @@ function resetGame() {
   gameMin = 420; exhaustion = 0;
   missedTasks = []; completedTasks = [];
   notif = null;
-  player.x = START_X; player.targetX = null; player.dir = 1; player.walkT = 0; player.moving = false;
+  player.x = START_X; player.targetX = null; player.pendingHotspot = null; player.dir = 1; player.walkT = 0; player.moving = false;
+  nextPlayerX = START_X;
   fadeAlpha = 0; fadeDir = 0;
   titleScreen.timer = 0;
   summaryScreen.timer = 0;
@@ -1059,25 +1395,36 @@ function loop(t) {
   }
 
   // Notification countdown
-  if (notif) { notif.timer -= dt; if (notif.timer <= 0) notif = null; }
+  if (notif) {
+    notif.timer -= dt;
+    if (notif.timer <= 0) {
+      notif = null;
+      if (window.GameUI) window.GameUI.clearNotification();
+    }
+  }
 
   // Fade
   if (fadeDir === -1) {
-    fadeAlpha += 1.8 * dt;
+    fadeAlpha += FADE_SPEED * dt;
     if (fadeAlpha >= 1) {
       fadeAlpha = 1; fadeDir = 1;
       currentScene = nextScene;
-      player.x = START_X; player.targetX = null; player.dir = 1; player.walkT = 0; player.moving = false;
+      player.x = nextPlayerX; player.targetX = null; player.pendingHotspot = null; player.dir = 1; player.walkT = 0; player.moving = false;
+      if (window.GameUI) window.GameUI.fadeFromBlack();
     }
   } else if (fadeDir === 1) {
-    fadeAlpha -= 1.8 * dt;
+    fadeAlpha -= FADE_SPEED * dt;
     if (fadeAlpha <= 0) { fadeAlpha = 0; fadeDir = 0; }
   }
 
   // Update + draw
   ctx.clearRect(0, 0, W, H);
   const sc = scenes[currentScene];
-  if (sc) { sc.update(dt); sc.draw(); }
+  if (sc) {
+    syncUI(sc.name);
+    sc.update(dt);
+    sc.draw();
+  }
 
   if (fadeAlpha > 0) {
     ctx.fillStyle = `rgba(0,0,0,${fadeAlpha})`;
@@ -1093,14 +1440,30 @@ function loop(t) {
 async function init() {
   await Promise.all([
     loadImg('cocina',            'assets/img/fondos/cocina.png'),
+    loadImg('cocina_desayuno_2', 'assets/img/fondos/cocinaDesayuno2.png'),
     loadImg('calle',             'assets/img/fondos/calle.png'),
     loadImg('colegio',           'assets/img/fondos/colegio.png'),
+    loadImg('colegio_puerta',    'assets/img/fondos/colegioNiñosPuerta.png'),
     loadImg('casa_abuela',       'assets/img/fondos/casa abuela.png'),
     loadImg('hospital',          'assets/img/fondos/hospital.png'),
+    loadImg('habitacion',        'assets/img/fondos/habitacion.png'),
     loadImg('hospital_interior', 'assets/img/fondos/interior hospital.png'),
+    loadImg('hospital_madre_sentada', 'assets/img/fondos/hospitalMadreSentada.png'),
+    loadImg('oficina_vacia',     'assets/img/fondos/oficinaVacia.png'),
+    loadImg('oficina_sentada',   'assets/img/fondos/oficinaMadreSentada.png'),
+    loadImg('madre_side',        'assets/img/personajes/madreLado.png'),
+    loadImg('madre_walk_1',      'assets/img/personajes/madreAndando1.png'),
+    loadImg('madre_walk_2',      'assets/img/personajes/madreAndando2.png'),
+    loadImg('madre_front',       'assets/img/personajes/madreFrente.png'),
+    loadImg('madre_back',        'assets/img/personajes/madreEspaldas.png'),
+    loadImg('madre_sitting',     'assets/img/personajes/madreSentada.png'),
+    loadImg('taza_1',            'assets/img/objetos/tazaDesayuno1.png'),
+    loadImg('taza_2',            'assets/img/objetos/tazaDesayuno2.png'),
+    loadImg('comida',            'assets/img/objetos/comida.png'),
+    loadImg('cena',              'assets/img/objetos/cena.png'),
     loadImg('coche',             'assets/img/objetos/coche bueno.png'),
     loadImg('notif',             'assets/img/objetos/notificacion.png'),
-    loadImg('clock',             'assets/img/objetos/reloj.png'),
+    loadImg('clock',             'assets/img/objetos/relojVacioContador.png'),
     loadImg('tareas',            'assets/img/objetos/tareas.png'),
   ]);
 

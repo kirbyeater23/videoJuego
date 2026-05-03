@@ -6,19 +6,169 @@
   <title>EMPATIA</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      width: 100%; height: 100%;
-      background: #000;
+    [v-cloak] { display: none; }
+    html, body, #app {
+      width: 100%;
+      height: 100%;
+      background: #fff;
       overflow: hidden;
+    }
+    body {
       display: flex;
       justify-content: center;
       align-items: center;
+      font-family: Arial, Helvetica, sans-serif;
     }
-    canvas { display: block; image-rendering: pixelated; }
+    .game-shell {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      image-rendering: auto;
+      cursor: pointer;
+      max-width: none;
+      max-height: none;
+    }
+    .vue-hud {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      color: #fff;
+    }
+    .hint-chip {
+      position: absolute;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+    .hud-asset {
+      position: absolute;
+      background-repeat: no-repeat;
+      pointer-events: none;
+    }
+    .tasks-paper {
+      left: 22px;
+      top: 24px;
+      width: clamp(150px, 16vw, 250px);
+      aspect-ratio: 0.72;
+      background-image: url('assets/img/objetos/tareas.png');
+      background-size: 263% 117%;
+      background-position: 49% 8%;
+      filter: drop-shadow(4px 8px 3px rgba(0,0,0,0.22));
+    }
+    .tasks-lines {
+      position: absolute;
+      left: 28%;
+      top: 22%;
+      width: 52%;
+      color: #d81716;
+      font-size: clamp(14px, 1.8vw, 28px);
+      line-height: 1.05;
+      font-family: "Comic Sans MS", "Segoe Print", cursive;
+      transform: rotate(-1deg);
+    }
+    .clock-object {
+      right: 22px;
+      top: 38px;
+      width: clamp(96px, 12vw, 160px);
+      aspect-ratio: 1.9;
+      background-image: url('assets/img/objetos/relojVacioContador.png');
+      background-size: 166% 177%;
+      background-position: 50% 48%;
+      filter: drop-shadow(3px 5px 2px rgba(0,0,0,0.28));
+    }
+    .clock-text {
+      position: absolute;
+      inset: 28% 17% 24% 14%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9d2e22;
+      font: 700 clamp(16px, 2.4vw, 31px)/1 monospace;
+      transform: rotate(-1deg);
+    }
+    .hint-chip {
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      padding: 8px 12px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.75);
+      white-space: nowrap;
+    }
+    .notice {
+      position: absolute;
+      right: -18px;
+      top: 132px;
+      width: min(680px, 56vw);
+      aspect-ratio: 4.55;
+      min-height: 74px;
+      padding: 24px 34px 16px 178px;
+      background-image: url('assets/img/objetos/notificacion.png');
+      background-repeat: no-repeat;
+      background-size: 100% auto;
+      background-position: center;
+      color: #fff;
+      text-align: left;
+      font-size: clamp(11px, 1.2vw, 15px);
+      line-height: 1.3;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+      filter: drop-shadow(3px 8px 3px rgba(0,0,0,0.18));
+      overflow: hidden;
+    }
+    .fade-layer {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .vue-hud.is-title .tasks-paper,
+    .vue-hud.is-title .clock-object,
+    .vue-hud.is-title .notice,
+    .vue-hud.is-title .hint-chip {
+      display: none;
+    }
+    @media (max-width: 720px) {
+      .tasks-paper { width: 120px; left: 8px; top: 10px; }
+      .tasks-lines { font-size: 12px; }
+      .clock-object { width: 84px; right: 8px; top: 12px; }
+      .notice { top: 76px; width: 330px; min-height: 54px; padding: 15px 18px 10px 92px; font-size: 10px; }
+      .hint-chip { font-size: 10px; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; }
+    }
   </style>
 </head>
 <body>
-  <canvas id="c"></canvas>
+  <div id="app" v-cloak>
+    <main class="game-shell">
+      <canvas id="c"></canvas>
+      <section class="vue-hud" :class="{ 'is-title': titleActive }">
+        <div class="hud-asset tasks-paper">
+          <div class="tasks-lines">
+            <div>hechas {{ completed }}</div>
+            <div>faltan {{ missed }}</div>
+            <div>{{ sceneName }}</div>
+          </div>
+        </div>
+        <div class="hud-asset clock-object">
+          <div class="clock-text">{{ clock }}</div>
+        </div>
+        <div class="notice" v-show="notification">{{ notification }}</div>
+        <div class="hint-chip">A / D para moverte · clic para interactuar</div>
+        <div class="fade-layer" ref="fadeLayer"></div>
+      </section>
+    </main>
+  </div>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/gsap@3/dist/gsap.min.js"></script>
+  <script src="js/ui.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>
