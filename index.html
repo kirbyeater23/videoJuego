@@ -50,17 +50,18 @@
     }
     .hud-asset {
       position: absolute;
-      background-repeat: no-repeat;
       pointer-events: none;
+    }
+    .hud-img {
+      display: block;
+      width: 100%;
+      height: auto;
+      user-select: none;
     }
     .tasks-paper {
       left: 22px;
       top: 24px;
       width: clamp(150px, 16vw, 250px);
-      aspect-ratio: 0.72;
-      background-image: url('assets/img/objetos/tareas.png');
-      background-size: 263% 117%;
-      background-position: 49% 8%;
       filter: drop-shadow(4px 8px 3px rgba(0,0,0,0.22));
     }
     .tasks-lines {
@@ -69,19 +70,36 @@
       top: 22%;
       width: 52%;
       color: #d81716;
-      font-size: clamp(14px, 1.8vw, 28px);
-      line-height: 1.05;
-      font-family: "Comic Sans MS", "Segoe Print", cursive;
+      font-size: clamp(7px, 0.74vw, 11px);
+      line-height: 1.1;
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      font-weight: 700;
       transform: rotate(-1deg);
+    }
+    .tasks-title {
+      font-size: 1.12em;
+      margin-bottom: 3px;
+    }
+    .tasks-section {
+      margin-top: 3px;
+    }
+    .tasks-heading {
+      color: #9d2e22;
+      font-size: 0.78em;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      margin-bottom: 1px;
+    }
+    .tasks-item {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-bottom: 1px;
     }
     .clock-object {
       right: 22px;
       top: 38px;
       width: clamp(96px, 12vw, 160px);
-      aspect-ratio: 1.9;
-      background-image: url('assets/img/objetos/relojVacioContador.png');
-      background-size: 166% 177%;
-      background-position: 50% 48%;
       filter: drop-shadow(3px 5px 2px rgba(0,0,0,0.28));
     }
     .clock-text {
@@ -138,7 +156,7 @@
     }
     @media (max-width: 720px) {
       .tasks-paper { width: 120px; left: 8px; top: 10px; }
-      .tasks-lines { font-size: 12px; }
+      .tasks-lines { font-size: 6px; }
       .clock-object { width: 84px; right: 8px; top: 12px; }
       .notice { top: 76px; width: 330px; min-height: 54px; padding: 15px 18px 10px 92px; font-size: 10px; }
       .hint-chip { font-size: 10px; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; }
@@ -151,13 +169,25 @@
       <canvas id="c"></canvas>
       <section class="vue-hud" :class="{ 'is-title': titleActive }">
         <div class="hud-asset tasks-paper">
+          <img class="hud-img" src="assets/img/objetos/tareas.png" alt="">
           <div class="tasks-lines">
-            <div>hechas {{ completed }}</div>
-            <div>faltan {{ missed }}</div>
-            <div>{{ sceneName }}</div>
+            <div class="tasks-title">Tareas</div>
+            <div class="tasks-section" v-if="currentTasks.length">
+              <div class="tasks-heading">Ahora</div>
+              <div class="tasks-item" v-for="(task, i) in currentTasks" :key="'current-' + i + '-' + task">{{ task }}</div>
+            </div>
+            <div class="tasks-section" v-if="completedTasks.length">
+              <div class="tasks-heading">Hechas</div>
+              <div class="tasks-item" v-for="(task, i) in completedTasks.slice(-3)" :key="'done-' + i + '-' + task">✓ {{ task }}</div>
+            </div>
+            <div class="tasks-section" v-if="missedTasks.length">
+              <div class="tasks-heading">Faltan</div>
+              <div class="tasks-item" v-for="(task, i) in missedTasks.slice(-4)" :key="'missed-' + i + '-' + task">• {{ task }}</div>
+            </div>
           </div>
         </div>
         <div class="hud-asset clock-object">
+          <img class="hud-img" src="assets/img/objetos/relojVacioContador.png" alt="">
           <div class="clock-text">{{ clock }}</div>
         </div>
         <div class="notice" v-show="notification">{{ notification }}</div>

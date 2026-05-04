@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -16,7 +18,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Inter, Arial, Helvetica, sans-serif;
 }
 
 .game-shell {
@@ -26,7 +28,8 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #fff;
+  padding: clamp(44px, 8vh, 92px) 0;
+  background: #f5f2ed;
   overflow: hidden;
 }
 
@@ -48,7 +51,7 @@ canvas {
 .hint-chip {
   position: absolute;
   left: 50%;
-  bottom: 18px;
+  bottom: clamp(12px, 2.2vh, 26px);
   transform: translateX(-50%);
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.5);
@@ -61,18 +64,20 @@ canvas {
 
 .hud-asset {
   position: absolute;
-  background-repeat: no-repeat;
   pointer-events: none;
 }
 
+.hud-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+
 .tasks-paper {
-  left: 22px;
-  top: 24px;
+  left: clamp(14px, 3vw, 56px);
+  top: clamp(6px, 1.2vh, 16px);
   width: clamp(150px, 16vw, 250px);
-  aspect-ratio: 0.72;
-  background-image: url('/assets/img/objetos/tareas.png');
-  background-size: 263% 117%;
-  background-position: 49% 8%;
   filter: drop-shadow(4px 8px 3px rgba(0, 0, 0, 0.22));
 }
 
@@ -82,20 +87,41 @@ canvas {
   top: 22%;
   width: 52%;
   color: #d81716;
-  font-size: clamp(14px, 1.8vw, 28px);
-  line-height: 1.05;
-  font-family: "Comic Sans MS", "Segoe Print", cursive;
+  font-size: clamp(7px, 0.74vw, 11px);
+  font-weight: 700;
+  line-height: 1.1;
+  font-family: Inter, Arial, Helvetica, sans-serif;
   transform: rotate(-1deg);
+}
+
+.tasks-title {
+  font-size: 1.12em;
+  margin-bottom: 3px;
+}
+
+.tasks-section {
+  margin-top: 3px;
+}
+
+.tasks-heading {
+  color: #9d2e22;
+  font-size: 0.78em;
+  letter-spacing: 0;
+  margin-bottom: 1px;
+  text-transform: uppercase;
+}
+
+.tasks-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 1px;
 }
 
 .clock-object {
   right: 22px;
   top: 38px;
   width: clamp(96px, 12vw, 160px);
-  aspect-ratio: 1.9;
-  background-image: url('/assets/img/objetos/relojVacioContador.png');
-  background-size: 166% 177%;
-  background-position: 50% 48%;
   filter: drop-shadow(3px 5px 2px rgba(0, 0, 0, 0.28));
 }
 
@@ -112,23 +138,24 @@ canvas {
 
 .notice {
   position: absolute;
-  right: -18px;
-  top: 132px;
-  width: min(680px, 56vw);
-  aspect-ratio: 4.55;
-  min-height: 74px;
-  padding: 24px 34px 16px 178px;
+  right: clamp(-220px, -12vw, -90px);
+  top: clamp(64px, 8vh, 98px);
+  width: min(860px, 72vw);
+  aspect-ratio: 1417 / 349;
+  padding: clamp(24px, 2.25vw, 36px) clamp(150px, 13vw, 210px) clamp(22px, 2vw, 34px) clamp(150px, 13vw, 210px);
   background-image: url('/assets/img/objetos/notificacion.png');
   background-repeat: no-repeat;
-  background-size: 100% auto;
-  background-position: center;
+  background-size: 135.5% auto;
+  background-position: 58% 18%;
   color: #fff;
+  display: flex;
+  align-items: center;
   text-align: left;
   font-size: clamp(11px, 1.2vw, 15px);
   line-height: 1.3;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   filter: drop-shadow(3px 8px 3px rgba(0, 0, 0, 0.18));
-  overflow: hidden;
+  overflow: visible;
 }
 
 .react-hud.is-title .tasks-paper,
@@ -142,24 +169,24 @@ canvas {
   .tasks-paper {
     width: 120px;
     left: 8px;
-    top: 10px;
+    top: 4px;
   }
 
   .tasks-lines {
-    font-size: 12px;
+    font-size: 6px;
   }
 
   .clock-object {
-    width: 84px;
+    width: 76px;
     right: 8px;
-    top: 12px;
+    top: 6px;
   }
 
   .notice {
-    top: 76px;
-    width: 330px;
-    min-height: 54px;
-    padding: 15px 18px 10px 92px;
+    top: 62px;
+    right: -82px;
+    width: 430px;
+    padding: 15px 88px 13px 88px;
     font-size: 10px;
   }
 

@@ -13,8 +13,9 @@ createApp({
       sceneName: 'EMPATIA',
       clock: '07:00',
       notification: '',
-      completed: 0,
-      missed: 0,
+      currentTasks: [],
+      completedTasks: [],
+      missedTasks: [],
       titleActive: true,
       _noticeTween: null,
     };
@@ -25,9 +26,10 @@ createApp({
       setScene: sceneName => { this.sceneName = sceneName || 'EMPATIA'; },
       setTitleActive: active => { this.titleActive = !!active; },
       setClock: clock => { this.clock = clock; },
-      setTasks: ({ completed, missed }) => {
-        this.completed = completed;
-        this.missed = missed;
+      setTasks: ({ current = [], completed = [], missed = [] }) => {
+        this.currentTasks = current;
+        this.completedTasks = completed;
+        this.missedTasks = missed;
       },
       setNotification: text => this.showNotification(text),
       clearNotification: () => { this.notification = ''; },

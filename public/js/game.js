@@ -15,7 +15,9 @@ const ctx = canvas.getContext('2d');
 canvas.width = W; canvas.height = H;
 
 function resize() {
-  const s = Math.max(window.innerWidth / W, window.innerHeight / H);
+  const verticalMargin = Math.max(96, window.innerHeight * 0.16);
+  const availableHeight = Math.max(240, window.innerHeight - verticalMargin);
+  const s = Math.min(window.innerWidth / W, availableHeight / H);
   canvas.style.width  = (W * s) + 'px';
   canvas.style.height = (H * s) + 'px';
 }
@@ -86,14 +88,23 @@ function fmtTime(m) {
   return String(h).padStart(2,'0') + ':' + String(mn).padStart(2,'0');
 }
 
+function sceneTaskLabels(scene) {
+  if (!scene || !Array.isArray(scene.hotspots)) return [];
+  return scene.hotspots
+    .filter(hs => !hs.isExit && !hs.done && !hs.missed)
+    .map(hs => hs.label);
+}
+
 function syncUI(sceneName) {
   if (!window.GameUI) return;
+  const scene = scenes[currentScene];
   window.GameUI.setTitleActive(currentScene === 0);
   window.GameUI.setScene(sceneName);
   window.GameUI.setClock(fmtTime(gameMin));
   window.GameUI.setTasks({
-    completed: completedTasks.length,
-    missed: missedTasks.length,
+    current: sceneTaskLabels(scene),
+    completed: completedTasks.map(t => t.label),
+    missed: missedTasks.map(t => t.label),
   });
 }
 
@@ -137,12 +148,40 @@ function drawBgImage(key, scrollX) {
   if (!img) return false;
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
+  if (key === 'habitacion') {
+    const s = Math.max(W / img.width, H / img.height);
+    const w = img.width * s;
+    const h = img.height * s;
+    ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+    return true;
+  }
   const bg = bgDrawSize(img);
   if (scrollX !== undefined) {
     ctx.drawImage(img, -scrollX, bg.y, bg.w, bg.h);
   } else {
     ctx.drawImage(img, bg.x, bg.y, bg.w, bg.h);
   }
+  return true;
+}
+
+function drawBgCover(key) {
+  const img = IMG[key];
+  if (!img) return false;
+  const s = Math.max(W / img.width, H / img.height);
+  const w = img.width * s;
+  const h = img.height * s;
+  ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+  return true;
+}
+
+function drawSleepingRoom(frameKeys, t) {
+  const frame = Math.floor(t * 2) % frameKeys.length;
+  ctx.save();
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  ctx.filter = 'brightness(48%)';
+  drawBgCover(frameKeys[frame]);
+  ctx.restore();
   return true;
 }
 
@@ -197,13 +236,13 @@ function drawRoomBg(wallCol, floorCol, baseboardCol) {
 }
 
 // ─── PLAYER DRAWING ──────────────────────────────────────────────────────────
-function drawPlayer(px, py, dir, wt, exh, moving) {
+function drawPlayer(px, py, dir, wt, exh, moving, maxH = PLAYER_H) {
   const spriteKey = moving
     ? WALK_FRAMES[Math.floor(wt * WALK_ANIM_FPS) % WALK_FRAMES.length]
     : 'madre_side';
   const sprite = IMG[spriteKey] || IMG['madre_side'];
   if (sprite) {
-    const h = PLAYER_H;
+    const h = maxH;
     const w = sprite.width * (h / sprite.height);
     ctx.save();
     ctx.translate(px, py);
@@ -494,6 +533,12 @@ function canLeaveForward(scene) {
 }
 
 function tryLeaveForward(scene) {
+  if (scene.requireTasksBeforeExit && !canLeaveForward(scene)) {
+    showNotif('Antes de salir tienes que vestirte.');
+    player.x = W - EDGE_EXIT;
+    player.targetX = null;
+    return false;
+  }
   const hadPending = missUndone(scene.hotspots, scene.name);
   scene.deadlineFired = true;
   if (hadPending) showNotif('Sales corriendo. Lo pendiente se acumula.');
@@ -518,12 +563,26 @@ function makeStaticScene(cfg) {
     hotspots: cfg.hotspots.map(h => new Hotspot(h)),
     deadline: cfg.deadline || null,
     deadlineFired: false,
+    requireTasksBeforeExit: !!cfg.requireTasksBeforeExit,
     notifs: cfg.notifs || [],
     notifFired: [],
     entered: false,
+    sleeping: !!cfg.sleepFrames,
+    sleepT: 0,
 
     update(dt) {
       if (!this.entered) { this.entered = true; if (cfg.onEnter) cfg.onEnter(this); }
+      if (this.sleeping) {
+        this.sleepT += dt / (cfg.sleepDuration || 2.4);
+        const alarm = this.hotspots[0];
+        if (pointer.clicked && alarm && alarm.isClicked(pointer.x, pointer.y)) {
+          alarm.done = true;
+          addDone(alarm.label, this.name);
+          this.sleeping = false;
+          showNotif('Alarma apagada.');
+        }
+        return;
+      }
       movePlayer(dt, { allowExit: true });
       interactHotspots(
         this.hotspots,
@@ -551,10 +610,14 @@ function makeStaticScene(cfg) {
     },
 
     draw() {
-      if (!drawBgImage(this.bgKey)) drawRoomBg(this.wallCol, this.floorCol);
-      drawSceneObjects(cfg.objects);
-      drawHotspots(this.hotspots, player.x, player.y);
-      drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
+      if (this.sleeping && cfg.sleepFrames) {
+        drawSleepingRoom(cfg.sleepFrames, this.sleepT);
+      } else {
+        if (!drawBgImage(this.bgKey)) drawRoomBg(this.wallCol, this.floorCol);
+        drawSceneObjects(cfg.objects);
+        drawHotspots(this.hotspots, player.x, player.y);
+        drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
+      }
       drawHUD(this.name);
     }
   };
@@ -697,10 +760,10 @@ function makeScrollScene(cfg) {
       ctx.fillStyle = '#2ecc71'; ctx.fillRect(W / 2 - 160, H - 22, 320 * prog, 12);
 
       if (cfg.vehicle === 'car') {
-        drawCar(this.carX, H - 365, 560);
+        drawCar(this.carX, H - 340, 470);
       } else if (this.bgKey === 'colegio') {
-        const carW = 560;
-        const carX = W - 560 + (1 - this.carT) * 480;
+        const carW = 470;
+        const carX = W - 470 + (1 - this.carT) * 480;
         drawCar(carX, H - 365, carW);
       }
 
@@ -777,7 +840,7 @@ function makeSchoolDoorScene(cfg) {
         ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = '#7a8c5a'; ctx.fillRect(0, GROUND - 10, W, H);
       }
-      drawCar(this.carX, H - 365, 560);
+      drawCar(this.carX, H - 340, 470);
       if (!this.done) {
         if (Math.abs(this.carX - this.carStopX) < 180) drawHotspots([this.door], this.door.x, this.door.y);
       }
@@ -865,7 +928,7 @@ function makeOfficeScene() {
       if (!drawBgImage(this.bgKey)) drawRoomBg('#cfd8dc', '#6a808c');
       if (this.seatedTimer <= 0) {
         drawHotspots(this.hotspots, player.x, player.y);
-        drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
+        drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving, 360);
       } else {
         drawSpriteGrounded('madre_sitting', W - 380, GROUND + 8, 320);
       }
@@ -891,33 +954,32 @@ const titleScreen = {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = '#d9d9d9';
-    ctx.fillRect(170, 250, 620, 430);
-
-    ctx.save();
-    ctx.translate(20, 0);
-    ctx.shadowColor = 'rgba(0,0,0,0.12)'; ctx.shadowBlur = 18;
-    ctx.fillStyle = '#1f1f1f'; ctx.font = 'bold 100px serif'; ctx.textAlign = 'left';
-    ctx.fillText('EMPATÍA', W / 2, H / 2 - 70);
-    ctx.shadowBlur = 0;
-
-    ctx.fillStyle = 'rgba(31,31,31,0.78)';
-    ctx.font = '22px sans-serif';
-    ctx.fillText('Un día en la vida de Luisa', W / 2, H / 2 - 10);
-
-    ctx.fillStyle = 'rgba(31,31,31,0.58)';
-    ctx.font = '16px sans-serif';
-    ctx.fillText('Un juego sobre el peso invisible del cuidado', W / 2, H / 2 + 28);
-
-    if (Math.floor(this.timer * 2) % 2 === 0) {
-      ctx.fillStyle = '#c28a06'; ctx.font = '20px sans-serif';
-      ctx.fillText('Haz clic para comenzar', W / 2, H / 2 + 54);
+    const titleImg = IMG['titulo'];
+    const shakeY = Math.sin(this.timer * 18) * 3.2 + Math.sin(this.timer * 31) * 1.1;
+    let titleBottom = H * 0.22;
+    if (titleImg) {
+      const titleW = Math.min(880, W * 0.58);
+      const titleH = titleImg.height * (titleW / titleImg.width);
+      const titleX = (W - titleW) / 2;
+      const titleY = Math.max(24, H * 0.06);
+      ctx.drawImage(titleImg, titleX, titleY, titleW, titleH);
+      titleBottom = titleY + titleH;
     }
 
-    ctx.restore();
+    const carW = Math.min(760, Math.max(560, W * 0.5));
+    const carX = (W - carW) / 2;
+    const carY = titleBottom + 72 + shakeY;
+    drawCar(carX, carY, carW);
 
-    ctx.fillStyle = 'rgba(31,31,31,0.38)'; ctx.font = '13px sans-serif'; ctx.textAlign = 'left';
-    ctx.fillText('Diseñado por Sandra Martínez y Beatriz Montes · ESD Madrid', W / 2, H - 18);
+    if (Math.floor(this.timer * 2) % 2 === 0) {
+      ctx.fillStyle = '#1f1f1f';
+      ctx.font = '600 24px Inter, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('haz clic para empezar', W / 2, H - 58);
+    }
+
+    ctx.fillStyle = 'rgba(31,31,31,0.38)'; ctx.font = '13px Inter, Arial, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Diseñado por Sandra Martínez y Beatriz Montes · ESD Madrid', W / 2, H - 24);
   }
 };
 
@@ -988,19 +1050,13 @@ function buildScenes() {
     makeStaticScene({
       name: 'Dormitorio — 07:00',
       bgKey: 'habitacion',
+      sleepFrames: ['madre_durmiendo_1', 'madre_durmiendo_2'],
+      sleepDuration: 2.6,
+      requireTasksBeforeExit: true,
       wallCol: '#c0a898', floorCol: '#6a5040',
-      objects: [
-        {
-          key: 'clock',
-          crop: { x: 430, y: 245, w: 1160, h: 610 },
-          x: 895,
-          y: 505,
-          w: 160,
-          h: 84,
-        },
-      ],
+      objects: [],
       hotspots: [
-        { x: 600, y: GROUND, label: 'Apagar la alarma', hitbox: { x: 810, y: 440, w: 190, h: 150 } },
+        { x: 600, y: GROUND, label: 'Apagar la alarma', hitbox: { x: 835, y: 360, w: 240, h: 155 } },
         { x: 1110, y: GROUND, label: 'Vestirse', maxPresses: 2, hitbox: { x: 1480, y: 145, w: 360, h: 650 } },
       ],
       deadline: 437,
@@ -1493,7 +1549,9 @@ async function init() {
     loadImg('colegio_puerta',    'assets/img/fondos/colegioNinosPuerta.png'),
     loadImg('casa_abuela',       'assets/img/fondos/casa abuela.png'),
     loadImg('hospital',          'assets/img/fondos/hospital.png'),
-    loadImg('habitacion',        'assets/img/fondos/habitacion.png'),
+    loadImg('habitacion',        'assets/img/fondos/habitacionDespertadorApagado.png'),
+    loadImg('madre_durmiendo_1', 'assets/img/fondos/madreDurmiendoHabitacion1.png'),
+    loadImg('madre_durmiendo_2', 'assets/img/fondos/madreDurmiendoHabitacion2.png'),
     loadImg('hospital_interior', 'assets/img/fondos/interior hospital.png'),
     loadImg('hospital_madre_sentada', 'assets/img/fondos/hospitalMadreSentada.png'),
     loadImg('oficina_vacia',     'assets/img/fondos/oficinaVacia.png'),
@@ -1512,6 +1570,7 @@ async function init() {
     loadImg('notif',             'assets/img/objetos/notificacion.png'),
     loadImg('clock',             'assets/img/objetos/relojVacioContador.png'),
     loadImg('tareas',            'assets/img/objetos/tareas.png'),
+    loadImg('titulo',            'assets/img/objetos/Titulo.png'),
   ]);
 
   buildScenes();

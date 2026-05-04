@@ -7,8 +7,9 @@ const initialHud = {
   sceneName: 'EMPATIA',
   clock: '07:00',
   notification: '',
-  completed: 0,
-  missed: 0,
+  currentTasks: [],
+  completedTasks: [],
+  missedTasks: [],
   titleActive: true,
 };
 
@@ -20,7 +21,12 @@ export default function Home() {
       setScene: sceneName => setHud(prev => ({ ...prev, sceneName: sceneName || 'EMPATIA' })),
       setTitleActive: active => setHud(prev => ({ ...prev, titleActive: !!active })),
       setClock: clock => setHud(prev => ({ ...prev, clock })),
-      setTasks: ({ completed, missed }) => setHud(prev => ({ ...prev, completed, missed })),
+      setTasks: ({ current = [], completed = [], missed = [] }) => setHud(prev => ({
+        ...prev,
+        currentTasks: current,
+        completedTasks: completed,
+        missedTasks: missed,
+      })),
       setNotification: text => setHud(prev => ({ ...prev, notification: text || '' })),
       clearNotification: () => setHud(prev => ({ ...prev, notification: '' })),
       fadeToBlack: () => {},
@@ -37,13 +43,31 @@ export default function Home() {
       <canvas id="c" />
       <section className={`react-hud${hud.titleActive ? ' is-title' : ''}`}>
         <div className="hud-asset tasks-paper">
+          <img className="hud-img" src="/assets/img/objetos/tareas.png" alt="" />
           <div className="tasks-lines">
-            <div>hechas {hud.completed}</div>
-            <div>faltan {hud.missed}</div>
-            <div>{hud.sceneName}</div>
+            <div className="tasks-title">Tareas</div>
+            {hud.currentTasks.length ? (
+              <div className="tasks-section">
+                <div className="tasks-heading">Ahora</div>
+                {hud.currentTasks.map((task, i) => <div className="tasks-item" key={`current-${i}-${task}`}>{task}</div>)}
+              </div>
+            ) : null}
+            {hud.completedTasks.length ? (
+              <div className="tasks-section">
+                <div className="tasks-heading">Hechas</div>
+                {hud.completedTasks.slice(-3).map((task, i) => <div className="tasks-item" key={`done-${i}-${task}`}>✓ {task}</div>)}
+              </div>
+            ) : null}
+            {hud.missedTasks.length ? (
+              <div className="tasks-section">
+                <div className="tasks-heading">Faltan</div>
+                {hud.missedTasks.slice(-4).map((task, i) => <div className="tasks-item" key={`missed-${i}-${task}`}>• {task}</div>)}
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="hud-asset clock-object">
+          <img className="hud-img" src="/assets/img/objetos/relojVacioContador.png" alt="" />
           <div className="clock-text">{hud.clock}</div>
         </div>
         {hud.notification ? <div className="notice">{hud.notification}</div> : null}
