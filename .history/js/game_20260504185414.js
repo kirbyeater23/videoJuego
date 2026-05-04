@@ -1633,10 +1633,6 @@ function buildScenes() {
           showNotif('Por fin, la cena.');
         }
         movePlayer(dt);
-        const isClickingDinner = pointer.clicked && this.hotspots[0].isClicked(pointer.x, pointer.y);
-        if (isClickingDinner) {
-          this.bgKey = 'cocina_cena_2';
-        }
         interactHotspots(this.hotspots, this.name, null, () => {
           this.bgKey = 'cocina_cena_2';
           showNotif('Después de cenar, a dormir.');

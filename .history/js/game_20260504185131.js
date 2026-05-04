@@ -221,11 +221,18 @@ function addDone(label, scene) {
 
 // ─── DRAW BACKGROUNDS ────────────────────────────────────────────────────────
 function bgDrawSize(img) {
+  let w = img.width;
+  let h = img.height;
+  if (w > W || h > H) {
+    const s = Math.min(W / w, H / h);
+    w *= s;
+    h *= s;
+  }
   return {
-    w: img.width,
-    h: img.height,
-    x: Math.floor((W - img.width) / 2),
-    y: Math.floor((H - img.height) / 2),
+    w: w,
+    h: h,
+    x: Math.floor((W - w) / 2),
+    y: Math.floor((H - h) / 2),
   };
 }
 
@@ -242,15 +249,6 @@ function drawBgImage(key, scrollX) {
     return true;
   }
   const bg = bgDrawSize(img);
-  if (key.startsWith('cocina') && scrollX === undefined) {
-    const s = Math.min(W / bg.w, H / bg.h);
-    if (s < 1) {
-      bg.w = Math.floor(bg.w * s);
-      bg.h = Math.floor(bg.h * s);
-      bg.x = Math.floor((W - bg.w) / 2);
-      bg.y = Math.floor((H - bg.h) / 2);
-    }
-  }
   if (scrollX !== undefined) {
     ctx.drawImage(img, -scrollX, bg.y, bg.w, bg.h);
   } else {
@@ -1633,10 +1631,6 @@ function buildScenes() {
           showNotif('Por fin, la cena.');
         }
         movePlayer(dt);
-        const isClickingDinner = pointer.clicked && this.hotspots[0].isClicked(pointer.x, pointer.y);
-        if (isClickingDinner) {
-          this.bgKey = 'cocina_cena_2';
-        }
         interactHotspots(this.hotspots, this.name, null, () => {
           this.bgKey = 'cocina_cena_2';
           showNotif('Después de cenar, a dormir.');
