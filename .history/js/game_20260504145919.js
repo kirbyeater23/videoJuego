@@ -1049,7 +1049,7 @@ function makeOfficeScene() {
       if (!drawBgImage(this.bgKey)) drawRoomBg('#cfd8dc', '#6a808c');
       if (!this.timelapseActive) {
         drawHotspots(this.hotspots, player.x, player.y);
-        drawPlayer(player.x, player.y * 1.75, player.dir, player.walkT, exhaustion, player.moving, 1500);
+        drawPlayer(player.x, player.y * 2, player.dir, player.walkT, exhaustion, player.moving, 1500);
       } else {
         
         const p = Math.min(1, this.timelapseTimer / this.timelapseDuration);
