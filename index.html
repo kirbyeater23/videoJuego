@@ -207,6 +207,32 @@
       transform: scale(0.96);
       background: rgba(95, 93, 93, 0.95);
     }
+    .sound-btn {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      z-index: 10;
+      width: 48px;
+      height: 48px;
+      border: 0;
+      border-radius: 50%;
+      background: rgba(130, 126, 126, 0.88);
+      color: #fff;
+      font-family: Inter;
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.22);
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    .sound-btn:active {
+      transform: scale(0.96);
+      background: rgba(95, 93, 93, 0.95);
+    }
     .vue-hud.is-title .tasks-paper,
     .vue-hud.is-title .clock-object,
     .vue-hud.is-title .notice,
@@ -294,6 +320,13 @@
         <button class="touch-btn" type="button" data-move-key="left" aria-label="Mover a la izquierda">‹</button>
         <button class="touch-btn" type="button" data-move-key="right" aria-label="Mover a la derecha">›</button>
       </div>
+      <button class="sound-btn" id="soundToggle" type="button" aria-label="Silenciar sonido"
+        onclick="(function(btn){
+          if (!window.GameAudio) return;
+          const m = window.GameAudio.toggle();
+          btn.textContent = m ? '×' : '♪';
+          btn.setAttribute('aria-label', m ? 'Activar sonido' : 'Silenciar sonido');
+        })(this)">♪</button>
     </main>
   </div>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>

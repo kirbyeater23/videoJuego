@@ -111,6 +111,37 @@ function loadImg(id, src) {
   });
 }
 
+// ─── AUDIO ───────────────────────────────────────────────────────────────────
+const SFX = {
+  fondo:  new Audio('assets/musica/sonidoFondo.wav'),
+  reloj:  new Audio('assets/musica/sonidoReloj.wav'),
+  escena: new Audio('assets/musica/salidaEntradaEscena.wav'),
+};
+SFX.fondo.loop = true;
+SFX.reloj.loop = true;
+
+let soundMuted = false;
+
+function playSfx(key) {
+  const a = SFX[key];
+  a.currentTime = 0;
+  a.play().catch(() => {});
+}
+
+function stopSfx(key) {
+  SFX[key].pause();
+  SFX[key].currentTime = 0;
+}
+
+window.GameAudio = {
+  toggle() {
+    soundMuted = !soundMuted;
+    for (const a of Object.values(SFX)) a.muted = soundMuted;
+    return soundMuted;
+  },
+  isMuted() { return soundMuted; },
+};
+
 // ─── STATE ───────────────────────────────────────────────────────────────────
 const SPEED_TBL = [340, 280, 220, 160];
 const FADE_SPEED = 3.8;
@@ -169,6 +200,7 @@ function showNotif(text) {
 
 function gotoScene(idx, startX = START_X) {
   if (fadeDir !== 0) return;
+  playSfx('escena');
   nextScene = idx;
   nextPlayerX = startX;
   fadeDir   = -1;
@@ -682,7 +714,11 @@ function makeStaticScene(cfg) {
     sleepT: 0,
 
     update(dt) {
-      if (!this.entered) { this.entered = true; if (cfg.onEnter) cfg.onEnter(this); }
+      if (!this.entered) {
+        this.entered = true;
+        if (cfg.sleepFrames) playSfx('reloj');
+        if (cfg.onEnter) cfg.onEnter(this);
+      }
       if (this.sleeping) {
         this.sleepT += dt / (cfg.sleepDuration || 2.4);
         const alarm = this.hotspots[0];
@@ -690,6 +726,7 @@ function makeStaticScene(cfg) {
           alarm.done = true;
           addDone(alarm.label, this.name);
           this.sleeping = false;
+          if (cfg.sleepFrames) stopSfx('reloj');
           showNotif('Alarma apagada.');
         }
         return;
@@ -1007,6 +1044,7 @@ function makeOfficeScene() {
         fireNotifs(this.notifs, this.notifFired);
         if (p >= 1) {
           this.deadlineFired = true;
+          stopSfx('reloj');
           advance(this);
         }
         return;
@@ -1030,6 +1068,7 @@ function makeOfficeScene() {
             player.pendingHotspot = null;
             if (desk.done) addDone(desk.label, this.name);
             showNotif('Te sientas a trabajar. Las horas pasan.');
+            playSfx('reloj');
           }
         }
       }
@@ -1236,6 +1275,7 @@ function makeHospitalConsultScene() {
         this.timelapseStart = gameMin;
         this._done = false;
         showNotif('Ahora toca esperar la consulta.');
+        playSfx('reloj');
       }
       if (this._done) return;
       this.timelapseTimer += dt;
@@ -1244,6 +1284,7 @@ function makeHospitalConsultScene() {
       fireNotifs(this.notifs, this.notifFired);
       if (p >= 1) {
         this._done = true;
+        stopSfx('reloj');
         if (!this._lateMissed) {
           this._lateMissed = true;
           if (addMissed('Recoger a los niños de extraescolares', this.name)) exhaustion = Math.min(3, exhaustion + 1);
@@ -1552,6 +1593,8 @@ function buildScenes() {
     makeScrollScene({
       name: 'A extraescolares — 15:30',
       bgKey: 'calle', endX: 1400,
+      vehicle: 'car',
+      carKey: 'car_with_children',
       deadline: 960, deadlineLabel: 'Llevar a los niños a extraescolares',
       notifs: []
     }),
@@ -1685,6 +1728,7 @@ function buildScenes() {
 
 // ─── RESET ───────────────────────────────────────────────────────────────────
 function resetGame() {
+  stopSfx('reloj');
   gameMin = 420; exhaustion = 0;
   missedTasks = []; completedTasks = [];
   notif = null;
@@ -1724,6 +1768,11 @@ function loop(t) {
     if (fadeAlpha >= 1) {
       fadeAlpha = 1;
       currentScene = nextScene;
+      if (currentScene >= 1 && currentScene < scenes.length - 1) {
+        if (SFX.fondo.paused) SFX.fondo.play().catch(() => {});
+      } else {
+        stopSfx('fondo');
+      }
       player.x = nextPlayerX; player.targetX = null; player.pendingHotspot = null; player.dir = 1; player.walkT = 0; player.moving = false;
       loadingTimer = LOADING_BLACK_TIME;
       fadeDir = 2;
