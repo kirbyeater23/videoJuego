@@ -987,7 +987,7 @@ function makeOfficeScene() {
     seatedTimer: 0,
     timelapseActive: false,
     timelapseTimer: 0,
-    timelapseDuration: 8,
+    timelapseDuration: 30,
     timelapseStart: 0,
 
     update(dt) {
@@ -1197,14 +1197,15 @@ function makeHospitalInteriorEntryScene() {
         showNotif('Acompaña a tu madre hasta la consulta.');
       }
       movePlayer(dt);
-      if (pointer.clicked && door.isClicked(pointer.x, pointer.y)) {
+      if (!door.done && pointer.clicked && door.isClicked(pointer.x, pointer.y)) {
+        door.done = true;
         addDone(door.label, this.name);
         advance(this);
       }
     },
     draw() {
       drawBgImage(this.bgKey);
-      drawHotspots([door], player.x, player.y);
+      if (!door.done) drawHotspots([door], player.x, player.y);
       drawWalkingPair();
       drawHUD(this.name);
     }
@@ -1227,18 +1228,22 @@ function makeHospitalConsultScene() {
     ],
     notifFired: [],
     _lateMissed: false,
+    _done: false,
     update(dt) {
       if (!this.entered) {
         this.entered = true;
         this.timelapseTimer = 0;
         this.timelapseStart = gameMin;
+        this._done = false;
         showNotif('Ahora toca esperar la consulta.');
       }
+      if (this._done) return;
       this.timelapseTimer += dt;
       const p = Math.min(1, this.timelapseTimer / this.timelapseDuration);
       gameMin = Math.min(this.waitUntil, this.timelapseStart + (this.waitUntil - this.timelapseStart) * p);
       fireNotifs(this.notifs, this.notifFired);
       if (p >= 1) {
+        this._done = true;
         if (!this._lateMissed) {
           this._lateMissed = true;
           if (addMissed('Recoger a los niños de extraescolares', this.name)) exhaustion = Math.min(3, exhaustion + 1);
@@ -1576,6 +1581,7 @@ function buildScenes() {
       update(dt) {
         if (!this.entered) {
           this.entered = true;
+          this._t = 0;
           showNotif('Llegas tarde. Tus hijos llevan esperando mucho tiempo solos.');
           exhaustion = Math.min(3, exhaustion + 1);
         }
@@ -1599,8 +1605,7 @@ function buildScenes() {
     // ── E18: Comedor 21:00 ───────────────────────────────────────────────────
     {
       name: 'Comedor — 21:00',
-      wallCol: '#2c1a10',
-      floorCol: '#180e08',
+      bgKey: 'cocina_cena_1',
       entered: false,
       hotspots: [
         new Hotspot({ x: 520, y: GROUND, label: 'Cenar', maxPresses: 1 }),
@@ -1608,6 +1613,7 @@ function buildScenes() {
       update(dt) {
         if (!this.entered) {
           this.entered = true;
+          this.bgKey = 'cocina_cena_1';
           player.x = START_X;
           player.targetX = null;
           player.pendingHotspot = null;
@@ -1615,12 +1621,13 @@ function buildScenes() {
         }
         movePlayer(dt);
         interactHotspots(this.hotspots, this.name, null, () => {
+          this.bgKey = 'cocina_cena_2';
           showNotif('Después de cenar, a dormir.');
           gotoScene(scenes.indexOf(this) + 1);
         });
       },
       draw() {
-        drawRoomBg(this.wallCol, this.floorCol);
+        if (!drawBgImage(this.bgKey)) drawRoomBg('#2c1a10', '#180e08');
         drawHotspots(this.hotspots, player.x, player.y);
         drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
         drawHUD(this.name);
@@ -1635,6 +1642,7 @@ function buildScenes() {
       update(dt) {
         if (!this.entered) {
           this.entered = true;
+          this._t = 0;
           showNotif('Por fin la cama. Mañana, todo empieza de nuevo.');
         }
         movePlayer(dt);
@@ -1784,6 +1792,8 @@ async function init() {
     loadImg('taza_2',            'assets/img/objetos/tazaDesayuno2.png'),
     loadImg('comida',            'assets/img/objetos/comida.png'),
     loadImg('cena',              'assets/img/objetos/cena.png'),
+    loadImg('cocina_cena_1',     'assets/img/fondos/cocinaCena1.png'),
+    loadImg('cocina_cena_2',     'assets/img/fondos/cocinaCena2.png'),
     loadImg('coche',             'assets/img/objetos/coche bueno.png'),
     loadImg('car_with_children', 'assets/img/personajes/madreCocheNinos.png'),
     loadImg('car_solo',          'assets/img/personajes/madreCocheSola.png'),
