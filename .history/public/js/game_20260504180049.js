@@ -1541,6 +1541,7 @@ function buildScenes() {
       bgKey: 'calle', endX: 1200,
       vehicle: 'car',
       carKey: 'car_grandma',
+      notifs: [{ time: 1066, text: 'Tus hijos llevan más de una hora esperando solos.' }]
     }),
     makeGrandmaDropoffScene(),
 
@@ -1549,7 +1550,6 @@ function buildScenes() {
     // ── E18: Comedor 21:00 ───────────────────────────────────────────────────
     {
       name: 'Comedor — 21:00',
-      bgKey: 'cocina_cena_1',
       wallCol: '#2c1a10',
       floorCol: '#180e08',
       entered: false,
@@ -1559,7 +1559,6 @@ function buildScenes() {
       update(dt) {
         if (!this.entered) {
           this.entered = true;
-          this.bgKey = 'cocina_cena_1';
           player.x = START_X;
           player.targetX = null;
           player.pendingHotspot = null;
@@ -1567,13 +1566,12 @@ function buildScenes() {
         }
         movePlayer(dt);
         interactHotspots(this.hotspots, this.name, null, () => {
-          this.bgKey = 'cocina_cena_2';
           showNotif('Después de cenar, a dormir.');
           gotoScene(scenes.indexOf(this) + 1);
         });
       },
       draw() {
-        if (!drawBgImage(this.bgKey)) drawRoomBg(this.wallCol, this.floorCol);
+        drawRoomBg(this.wallCol, this.floorCol);
         drawHotspots(this.hotspots, player.x, player.y);
         drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
         drawHUD(this.name);

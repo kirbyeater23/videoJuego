@@ -111,6 +111,37 @@ function loadImg(id, src) {
   });
 }
 
+// ─── AUDIO ───────────────────────────────────────────────────────────────────
+const SFX = {
+  fondo:  new Audio('assets/musica/sonidoFondo.wav'),
+  reloj:  new Audio('assets/musica/sonidoReloj.wav'),
+  escena: new Audio('assets/musica/salidaEntradaEscena.wav'),
+};
+SFX.fondo.loop = true;
+SFX.reloj.loop = true;
+
+let soundMuted = false;
+
+function playSfx(key) {
+  const a = SFX[key];
+  a.currentTime = 0;
+  a.play().catch(() => {});
+}
+
+function stopSfx(key) {
+  SFX[key].pause();
+  SFX[key].currentTime = 0;
+}
+
+window.GameAudio = {
+  toggle() {
+    soundMuted = !soundMuted;
+    for (const a of Object.values(SFX)) a.muted = soundMuted;
+    return soundMuted;
+  },
+  isMuted() { return soundMuted; },
+};
+
 // ─── STATE ───────────────────────────────────────────────────────────────────
 const SPEED_TBL = [340, 280, 220, 160];
 const FADE_SPEED = 3.8;
@@ -169,6 +200,7 @@ function showNotif(text) {
 
 function gotoScene(idx, startX = START_X) {
   if (fadeDir !== 0) return;
+  playSfx('escena');
   nextScene = idx;
   nextPlayerX = startX;
   fadeDir   = -1;
@@ -682,7 +714,11 @@ function makeStaticScene(cfg) {
     sleepT: 0,
 
     update(dt) {
-      if (!this.entered) { this.entered = true; if (cfg.onEnter) cfg.onEnter(this); }
+      if (!this.entered) {
+        this.entered = true;
+        if (cfg.sleepFrames) playSfx('reloj');
+        if (cfg.onEnter) cfg.onEnter(this);
+      }
       if (this.sleeping) {
         this.sleepT += dt / (cfg.sleepDuration || 2.4);
         const alarm = this.hotspots[0];
@@ -690,6 +726,7 @@ function makeStaticScene(cfg) {
           alarm.done = true;
           addDone(alarm.label, this.name);
           this.sleeping = false;
+          if (cfg.sleepFrames) stopSfx('reloj');
           showNotif('Alarma apagada.');
         }
         return;
@@ -987,7 +1024,7 @@ function makeOfficeScene() {
     seatedTimer: 0,
     timelapseActive: false,
     timelapseTimer: 0,
-    timelapseDuration: 8,
+    timelapseDuration: 30,
     timelapseStart: 0,
 
     update(dt) {
@@ -1007,6 +1044,7 @@ function makeOfficeScene() {
         fireNotifs(this.notifs, this.notifFired);
         if (p >= 1) {
           this.deadlineFired = true;
+          
           advance(this);
         }
         return;
@@ -1030,6 +1068,7 @@ function makeOfficeScene() {
             player.pendingHotspot = null;
             if (desk.done) addDone(desk.label, this.name);
             showNotif('Te sientas a trabajar. Las horas pasan.');
+            
           }
         }
       }
@@ -1049,9 +1088,9 @@ function makeOfficeScene() {
       if (!drawBgImage(this.bgKey)) drawRoomBg('#cfd8dc', '#6a808c');
       if (!this.timelapseActive) {
         drawHotspots(this.hotspots, player.x, player.y);
-        drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving, 820);
+        drawPlayer(player.x, player.y * 2, player.dir, player.walkT, exhaustion, player.moving, 1500);
       } else {
-        drawSpriteGrounded('madre_sitting', W - 380, GROUND + 8, 320);
+        
         const p = Math.min(1, this.timelapseTimer / this.timelapseDuration);
         ctx.fillStyle = 'rgba(0,0,0,0.42)';
         ctx.fillRect(W / 2 - 220, H - 60, 440, 16);
@@ -1128,6 +1167,7 @@ function makeGrandmaPickupScene() {
         drawCar(this.carX, H - 340, 470, 'car_solo');
         if (Math.abs(this.carX - 690) < 260) drawHotspots([door], door.x, door.y);
       } else {
+        drawCar(this.carX, H - 340, 470, 'car_solo');
         drawHotspots([grandma], grandma.x, grandma.y);
       }
       drawHUD(this.name);
@@ -1142,8 +1182,6 @@ function makeHospitalArrivalScene() {
     bgKey: 'hospital',
     entered: false,
     carX: 80,
-    phase: 'arrive',
-    entryTimer: 0,
     update(dt) {
       if (!this.entered) {
         this.entered = true;
@@ -1181,14 +1219,15 @@ function makeHospitalInteriorEntryScene() {
         showNotif('Acompaña a tu madre hasta la consulta.');
       }
       movePlayer(dt);
-      if (pointer.clicked && door.isClicked(pointer.x, pointer.y)) {
+      if (!door.done && pointer.clicked && door.isClicked(pointer.x, pointer.y)) {
+        door.done = true;
         addDone(door.label, this.name);
         advance(this);
       }
     },
     draw() {
       drawBgImage(this.bgKey);
-      drawHotspots([door], player.x, player.y);
+      if (!door.done) drawHotspots([door], player.x, player.y);
       drawWalkingPair();
       drawHUD(this.name);
     }
@@ -1211,18 +1250,24 @@ function makeHospitalConsultScene() {
     ],
     notifFired: [],
     _lateMissed: false,
+    _done: false,
     update(dt) {
       if (!this.entered) {
         this.entered = true;
         this.timelapseTimer = 0;
         this.timelapseStart = gameMin;
+        this._done = false;
         showNotif('Ahora toca esperar la consulta.');
+       
       }
+      if (this._done) return;
       this.timelapseTimer += dt;
       const p = Math.min(1, this.timelapseTimer / this.timelapseDuration);
       gameMin = Math.min(this.waitUntil, this.timelapseStart + (this.waitUntil - this.timelapseStart) * p);
       fireNotifs(this.notifs, this.notifFired);
       if (p >= 1) {
+        this._done = true;
+        
         if (!this._lateMissed) {
           this._lateMissed = true;
         }
@@ -1527,7 +1572,6 @@ function buildScenes() {
     }),
 
 
-    }),
 
     // ── E9-E16: Casa de la abuela y hospital ─────────────────────────────────
     makeGrandmaPickupScene(),
@@ -1541,6 +1585,7 @@ function buildScenes() {
       bgKey: 'calle', endX: 1200,
       vehicle: 'car',
       carKey: 'car_grandma',
+      notifs: [{ time: 1066, text: 'Tus hijos llevan más de una hora esperando solos.' }]
     }),
     makeGrandmaDropoffScene(),
 
@@ -1550,8 +1595,6 @@ function buildScenes() {
     {
       name: 'Comedor — 21:00',
       bgKey: 'cocina_cena_1',
-      wallCol: '#2c1a10',
-      floorCol: '#180e08',
       entered: false,
       hotspots: [
         new Hotspot({ x: 520, y: GROUND, label: 'Cenar', maxPresses: 1 }),
@@ -1573,7 +1616,7 @@ function buildScenes() {
         });
       },
       draw() {
-        if (!drawBgImage(this.bgKey)) drawRoomBg(this.wallCol, this.floorCol);
+        if (!drawBgImage(this.bgKey)) drawRoomBg('#2c1a10', '#180e08');
         drawHotspots(this.hotspots, player.x, player.y);
         drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
         drawHUD(this.name);
@@ -1588,6 +1631,7 @@ function buildScenes() {
       update(dt) {
         if (!this.entered) {
           this.entered = true;
+          this._t = 0;
           showNotif('Por fin la cama. Mañana, todo empieza de nuevo.');
         }
         movePlayer(dt);
@@ -1630,6 +1674,7 @@ function buildScenes() {
 
 // ─── RESET ───────────────────────────────────────────────────────────────────
 function resetGame() {
+  stopSfx('reloj');
   gameMin = 420; exhaustion = 0;
   missedTasks = []; completedTasks = [];
   notif = null;
@@ -1669,6 +1714,11 @@ function loop(t) {
     if (fadeAlpha >= 1) {
       fadeAlpha = 1;
       currentScene = nextScene;
+      if (currentScene >= 1 && currentScene < scenes.length - 1) {
+        if (SFX.fondo.paused) SFX.fondo.play().catch(() => {});
+      } else {
+        stopSfx('fondo');
+      }
       player.x = nextPlayerX; player.targetX = null; player.pendingHotspot = null; player.dir = 1; player.walkT = 0; player.moving = false;
       loadingTimer = LOADING_BLACK_TIME;
       fadeDir = 2;
@@ -1737,6 +1787,8 @@ async function init() {
     loadImg('taza_2',            'assets/img/objetos/tazaDesayuno2.png'),
     loadImg('comida',            'assets/img/objetos/comida.png'),
     loadImg('cena',              'assets/img/objetos/cena.png'),
+    loadImg('cocina_cena_1',     'assets/img/fondos/cocinaCena1.png'),
+    loadImg('cocina_cena_2',     'assets/img/fondos/cocinaCena2.png'),
     loadImg('coche',             'assets/img/objetos/coche bueno.png'),
     loadImg('car_with_children', 'assets/img/personajes/madreCocheNinos.png'),
     loadImg('car_solo',          'assets/img/personajes/madreCocheSola.png'),
