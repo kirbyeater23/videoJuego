@@ -1,7 +1,7 @@
 'use client';
 
 import Script from 'next/script';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const initialHud = {
   sceneName: 'EMPATIA',
@@ -15,6 +15,8 @@ const initialHud = {
 
 export default function Home() {
   const [hud, setHud] = useState(initialHud);
+  const [displayNotification, setDisplayNotification] = useState('');
+  const noticeTweenRef = useRef(null);
 
   useEffect(() => {
     window.GameUI = {

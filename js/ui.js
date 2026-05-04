@@ -18,6 +18,7 @@ createApp({
       missedTasks: [],
       titleActive: true,
       _noticeTween: null,
+      _typeTween: null,
     };
   },
 
@@ -59,10 +60,28 @@ createApp({
       this.notification = text || '';
       nextTick(() => {
         if (this._noticeTween) this._noticeTween.kill();
+        if (this._typeTween) this._typeTween.kill();
+        const noticeText = document.querySelector('.notice-text');
+        const fullText = this.notification;
+        if (noticeText) noticeText.textContent = '';
         this._noticeTween = gsap.fromTo('.notice',
           { opacity: 0, x: 42, scale: 0.98 },
           { opacity: 1, x: 0, scale: 1, duration: 0.35, ease: 'back.out(1.5)' }
         );
+        if (!noticeText || !fullText) return;
+        const cursor = { count: 0 };
+        this._typeTween = gsap.to(cursor, {
+          count: fullText.length,
+          duration: Math.min(2.4, Math.max(0.55, fullText.length * 0.035)),
+          ease: 'none',
+          snap: { count: 1 },
+          onUpdate: () => {
+            noticeText.textContent = fullText.slice(0, cursor.count);
+          },
+          onComplete: () => {
+            noticeText.textContent = fullText;
+          },
+        });
       });
     },
   },

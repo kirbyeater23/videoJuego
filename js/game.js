@@ -18,8 +18,11 @@ function resize() {
   const verticalMargin = Math.max(96, window.innerHeight * 0.16);
   const availableHeight = Math.max(240, window.innerHeight - verticalMargin);
   const s = Math.min(window.innerWidth / W, availableHeight / H);
-  canvas.style.width  = (W * s) + 'px';
-  canvas.style.height = (H * s) + 'px';
+  const canvasW = W * s;
+  const canvasH = H * s;
+  canvas.style.width  = canvasW + 'px';
+  canvas.style.height = canvasH + 'px';
+  document.documentElement.style.setProperty('--game-canvas-top', ((window.innerHeight - canvasH) / 2) + 'px');
 }
 window.addEventListener('resize', resize);
 resize();
@@ -341,13 +344,13 @@ function drawHUD(sceneName) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(W - 180, 8, 172, 50);
   }
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 26px monospace'; ctx.textAlign = 'right';
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 26px Inter'; ctx.textAlign = 'right';
   ctx.fillText(fmtTime(gameMin), W - 14, 48);
 
   // Scene label — top left
   ctx.fillStyle = 'rgba(0,0,0,0.45)';
   ctx.fillRect(0, 0, 320, 40);
-  ctx.fillStyle = '#eee'; ctx.font = '15px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#eee'; ctx.font = '15px Inter'; ctx.textAlign = 'left';
   ctx.fillText(sceneName, 10, 26);
 
   // Exhaustion dots — top center
@@ -369,7 +372,7 @@ function drawHUD(sceneName) {
       ctx.fillStyle = '#1abc9c';
       ctx.fillRect(W / 2 - 260, 44, 520, 52);
     }
-    ctx.fillStyle = '#fff'; ctx.font = '17px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff'; ctx.font = '17px Inter'; ctx.textAlign = 'center';
     ctx.fillText(notif.text, W / 2, 77);
     ctx.globalAlpha = 1;
   }
@@ -381,7 +384,7 @@ function drawHUD(sceneName) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(W - 205, H - 180, 198, 172);
   }
-  ctx.fillStyle = '#fff'; ctx.font = '13px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff'; ctx.font = '13px Inter'; ctx.textAlign = 'left';
   ctx.fillText('✓ ' + completedTasks.length + ' hechas', W - 198, H - 158);
 
   // Missed tasks panel — bottom left (grows with misses)
@@ -389,16 +392,27 @@ function drawHUD(sceneName) {
     const ph = 28 + missedTasks.length * 20;
     ctx.fillStyle = 'rgba(180,30,30,0.88)';
     ctx.fillRect(6, H - ph - 6, 270, ph);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Inter'; ctx.textAlign = 'left';
     ctx.fillText('Pendiente:', 14, H - ph + 14);
-    ctx.font = '12px sans-serif';
+    ctx.font = '12px Inter';
     missedTasks.forEach((t, i) => ctx.fillText('• ' + t.label, 14, H - ph + 28 + i * 20));
   }
 
-  // Controls hint — bottom center
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('A / D para moverte   clic para interactuar', W / 2, H - 6);
+  // Controls hint — top center
+  const hintText = 'A / D para moverte · clic para interactuar';
+  ctx.font = '700 18px Inter';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const pad = 4;
+  const hintW = ctx.measureText(hintText).width + pad * 2;
+  const hintH = 30;
+  const hintX = W / 2 - hintW / 2;
+  const hintY = 72;
+  ctx.fillStyle = 'rgba(90,90,90,0.88)';
+  ctx.fillRect(hintX, hintY, hintW, hintH);
+  ctx.fillStyle = '#e6e6e6';
+  ctx.fillText(hintText, W / 2, hintY + hintH / 2);
+  ctx.textBaseline = 'alphabetic';
 }
 
 // ─── HOTSPOT ─────────────────────────────────────────────────────────────────
@@ -439,12 +453,13 @@ function drawHotspots(hotspots, px, py) {
   const nearHotspots = [];
   hotspots.forEach(hs => {
     if (hs.done) return;
+    if (hs.isExit) return;
     const near = hs.isNear(px, py);
     if (hs.imgKey && !hs.hitbox) {
       drawImageCentered(hs.imgKey, hs.x, hs.y - 62, 120, 120);
     }
     if (near && hs.maxPresses > 1) {
-      ctx.fillStyle = '#f1c40f'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#f1c40f'; ctx.font = '13px Inter'; ctx.textAlign = 'center';
       ctx.fillText(hs.progress + '/' + hs.maxPresses, hs.x, hs.y + hs.r + 18);
     }
     if (near) nearHotspots.push(hs);
@@ -465,18 +480,18 @@ function drawHotspots(hotspots, px, py) {
     ctx.fill();
 
     ctx.fillStyle = '#fff';
-    ctx.font = '700 1rem Inter, Arial, sans-serif';
+    ctx.font = '700 1rem Inter';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(hs.label, bubbleX + bubbleW / 2, bubbleY + 22);
 
     ctx.fillStyle = '#f1c40f';
-    ctx.font = '600 1rem Inter, Arial, sans-serif';
+    ctx.font = '600 1rem Inter';
     ctx.fillText('Clic para interactuar', bubbleX + bubbleW / 2, bubbleY + 43);
     if (hs.maxPresses > 1) {
       const remaining = Math.max(1, hs.maxPresses - hs.progress);
       ctx.fillStyle = '#fff';
-      ctx.font = '600 1rem Inter, Arial, sans-serif';
+      ctx.font = '600 1rem Inter';
       ctx.fillText(`${remaining} clics`, bubbleX + bubbleW / 2, bubbleY + 62);
     }
   });
@@ -520,7 +535,7 @@ function movePlayer(dt, opts = {}) {
 
 function interactHotspots(hotspots, sceneName, onExit, onDone) {
   const clickedHotspot = pointer.clicked
-    ? hotspots.find(hs => !hs.done && hs.isClicked(pointer.x, pointer.y))
+    ? hotspots.find(hs => !hs.done && !hs.isExit && hs.isClicked(pointer.x, pointer.y))
     : null;
   if (clickedHotspot && !clickedHotspot.isNear(player.x, player.y)) {
     player.targetX = Math.max(40, Math.min(W - 40, clickedHotspot.x));
@@ -796,7 +811,7 @@ function makeScrollScene(cfg) {
       if (destX < W - 20) {
         ctx.fillStyle = 'rgba(46,204,113,0.7)';
         ctx.fillRect(destX - 18, GROUND - 90, 36, 90);
-        ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 22px Inter'; ctx.textAlign = 'center';
         ctx.fillText('★', destX, GROUND - 55);
       }
       // progress bar
@@ -1027,15 +1042,19 @@ function makeGrandmaPickupScene() {
         this.phase = 'door';
         this.bgKey = 'casa_abuela';
         this.carX = 150;
-        showNotif('Has llegado a casa de tu madre.');
+        showNotif('Llega a casa de tu madre.');
       }
       if (this.phase === 'drive') {
         moveSceneCar(this, dt, { minX: 40 });
         if (this.carX > W + EDGE_EXIT) advance(this);
         return;
       }
+      if (this.phase === 'door') {
+        moveSceneCar(this, dt, { minX: 40, maxX: W - 540 });
+      }
       const active = this.phase === 'door' ? door : grandma;
-      if (pointer.clicked && active.isClicked(pointer.x, pointer.y)) {
+      const canUseDoor = this.phase !== 'door' || Math.abs(this.carX - 690) < 260;
+      if (canUseDoor && pointer.clicked && active.isClicked(pointer.x, pointer.y)) {
         if (this.phase === 'door') {
           this.phase = 'grandma';
           this.bgKey = 'casa_abuela_con_abuela';
@@ -1054,9 +1073,11 @@ function makeGrandmaPickupScene() {
       drawBgImage(this.bgKey);
       if (this.phase === 'drive') {
         drawCar(this.carX, H - 340, 470, 'car_grandma');
+      } else if (this.phase === 'door') {
+        drawCar(this.carX, H - 340, 470, 'car_solo');
+        if (Math.abs(this.carX - 690) < 260) drawHotspots([door], door.x, door.y);
       } else {
-        const active = this.phase === 'door' ? door : grandma;
-        drawHotspots([active], active.x, active.y);
+        drawHotspots([grandma], grandma.x, grandma.y);
       }
       drawHUD(this.name);
     }
@@ -1181,7 +1202,7 @@ function makeHospitalConsultScene() {
       ctx.fillStyle = '#3498db';
       ctx.fillRect(W / 2 - 230, H - 64, 460 * p, 16);
       ctx.fillStyle = '#fff';
-      ctx.font = '18px Inter, Arial, sans-serif';
+      ctx.font = '18px Inter';
       ctx.textAlign = 'center';
       ctx.fillText('Esperando en consulta...', W / 2, H - 78);
       drawHUD(this.name);
@@ -1304,12 +1325,12 @@ const titleScreen = {
 
     if (Math.floor(this.timer * 2) % 2 === 0) {
       ctx.fillStyle = '#1f1f1f';
-      ctx.font = '600 24px Inter, Arial, sans-serif';
+      ctx.font = '600 24px Inter';
       ctx.textAlign = 'center';
       ctx.fillText('haz clic para empezar', W / 2, H - 58);
     }
 
-    ctx.fillStyle = 'rgba(31,31,31,0.38)'; ctx.font = '13px Inter, Arial, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(31,31,31,0.38)'; ctx.font = '13px Inter'; ctx.textAlign = 'center';
     ctx.fillText('Diseñado por Sandra Martínez y Beatriz Montes · ESD Madrid', W / 2, H - 24);
   }
 };
@@ -1320,19 +1341,19 @@ const summaryScreen = {
   timer: 0,
   update(dt) {
     this.timer += dt;
-    if (this.timer > 3 && pointer.clicked) resetGame();
+    if (pointer.clicked) resetGame();
   },
   draw() {
     ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = '#c0392b'; ctx.font = 'bold 52px serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#c0392b'; ctx.font = 'bold 52px Inter'; ctx.textAlign = 'center';
     ctx.fillText('Fin del día', W / 2, 75);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '18px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '18px Inter';
     ctx.fillText('Mañana, todo vuelve a empezar.', W / 2, 115);
 
     // exhaustion bar
-    ctx.fillStyle = '#c0392b'; ctx.font = 'bold 18px sans-serif';
+    ctx.fillStyle = '#c0392b'; ctx.font = 'bold 18px Inter';
     ctx.fillText('Agotamiento final: ' + exhaustion + '/3', W / 2, 155);
     for (let i = 0; i < 3; i++) {
       ctx.beginPath(); ctx.arc(W / 2 - 34 + i * 34, 178, 13, 0, Math.PI * 2);
@@ -1341,19 +1362,19 @@ const summaryScreen = {
     }
 
     // completed column
-    ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 17px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillStyle = '#2ecc71'; ctx.font = 'bold 17px Inter'; ctx.textAlign = 'left';
     ctx.fillText('✓ Completadas (' + completedTasks.length + ')', 40, 218);
-    ctx.fillStyle = 'rgba(255,255,255,0.78)'; ctx.font = '14px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.78)'; ctx.font = '14px Inter';
     completedTasks.slice(0, 14).forEach((t, i) => ctx.fillText('• ' + t.label, 50, 240 + i * 22));
 
     // missed column
-    ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 17px sans-serif';
+    ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 17px Inter';
     ctx.fillText('✗ Perdidas (' + missedTasks.length + ')', W / 2 + 20, 218);
-    ctx.fillStyle = 'rgba(255,190,170,0.85)'; ctx.font = '14px sans-serif';
+    ctx.fillStyle = 'rgba(255,190,170,0.85)'; ctx.font = '14px Inter';
     missedTasks.forEach((t, i) => ctx.fillText('• ' + t.label, W / 2 + 30, 240 + i * 22));
 
     // emotional quote
-    ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = 'italic 17px serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = 'italic 17px Inter';
     const quote = exhaustion >= 3
       ? '"El cuidado invisible agota en silencio."'
       : exhaustion >= 2
@@ -1361,10 +1382,8 @@ const summaryScreen = {
       : '"Cada día es una maratón sin línea de meta."';
     ctx.fillText(quote, W / 2, H - 64);
 
-    if (this.timer > 3) {
-      ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '17px sans-serif';
-      ctx.fillText('Haz clic para volver al inicio', W / 2, H - 30);
-    }
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '17px Inter';
+    ctx.fillText('Haz clic para volver al inicio', W / 2, H - 30);
   }
 };
 
@@ -1518,140 +1537,43 @@ function buildScenes() {
           ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, W, H);
           ctx.fillStyle = '#7a8c5a'; ctx.fillRect(0, GROUND - 10, W, H);
         }
-        ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 17px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 17px Inter'; ctx.textAlign = 'center';
         ctx.fillText('Tus hijos te esperan… llevan mucho tiempo solos.', W / 2, 90);
         drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
         drawHUD(this.name);
       }
     },
 
-    // ── E13: En casa 18:30 — 3 tareas imposibles simultáneas ─────────────────
+    // ── E18: Comedor 21:00 ───────────────────────────────────────────────────
     {
-      name: 'En casa — 18:30',
-      bgKey: 'cocina',
-      wallCol: '#e8d5b0', floorCol: '#8b6914',
-      entered: false,
-      deadline: 1260,
-      deadlineFired: false,
-      hotspots: [
-        new Hotspot({ x: 160, y: GROUND, label: 'Hacer la cena', maxPresses: 4, imgKey: 'cena' }),
-        new Hotspot({ x: 420, y: GROUND, label: 'Deberes con los niños', maxPresses: 3 }),
-        new Hotspot({ x: 680, y: GROUND, label: 'Llamar a mamá (noche)', maxPresses: 1 }),
-        new Hotspot({ x: 920, y: GROUND, label: 'Poner lavadora' }),
-        new Hotspot({ x: 1120, y: GROUND, label: 'Limpiar baño', maxPresses: 2 }),
-        new Hotspot({ x: 1160, y: GROUND - 55, label: 'Informe jefa (urgente)', maxPresses: 2 }),
-      ],
-      notifs: [
-        { time: 1122, text: 'Tus hijos lloran. Dicen que nunca estás con ellos.' },
-        { time: 1152, text: 'Tu madre: "No me has llamado en todo el día."' },
-        { time: 1182, text: 'Jefa: "¿Puedes terminar el informe esta noche?"' },
-        { time: 1218, text: 'Son las 20:18. La cena no está. Los deberes, a medias.' },
-        { time: 1245, text: 'Aviso: en 15 minutos son las 21:00.' },
-      ],
-      notifFired: [],
-
-      update(dt) {
-        if (!this.entered) {
-          this.entered = true;
-          showNotif('Hay demasiado que hacer. Elige.');
-        }
-        movePlayer(dt);
-        interactHotspots(this.hotspots, this.name, null);
-        fireNotifs(this.notifs, this.notifFired);
-
-        if (!this.deadlineFired && gameMin >= this.deadline) {
-          this.deadlineFired = true;
-          missUndone(this.hotspots, this.name);
-          gotoScene(scenes.indexOf(this) + 1);
-        }
-      },
-
-      draw() {
-        if (!drawBgImage(this.bgKey)) drawRoomBg(this.wallCol, this.floorCol);
-
-        // visual chaos tint
-        if (missedTasks.length > 2) {
-          ctx.fillStyle = `rgba(180,30,30,${Math.min(0.28, (missedTasks.length - 2) * 0.05)})`;
-          ctx.fillRect(0, 0, W, H);
-        }
-
-        drawHotspots(this.hotspots, player.x, player.y);
-        drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
-        drawHUD(this.name);
-      }
-    },
-
-    // ── E14: Comedor 21:00 ────────────────────────────────────────────────────
-    makeStaticScene({
       name: 'Comedor — 21:00',
-      wallCol: '#2c1a10', floorCol: '#180e08',
-      hotspots: [
-        { x: 360, y: GROUND, label: 'Cenar (por fin)' },
-        { x: 650, y: GROUND, label: 'Hablar con tus hijos' },
-        { x: 900, y: GROUND, label: 'Fregar los platos', maxPresses: 1 },
-        { x: 1150, y: GROUND, label: 'Continuar', isExit: true },
-      ],
-      notifs: [{ time: 1262, text: 'Son las 21:02. Un momento de silencio.' }]
-    }),
-
-    // ── E15: Baño 21:45 → deadline 22:00 ─────────────────────────────────────
-    makeStaticScene({
-      name: 'Baño — 21:45',
-      wallCol: '#d6e8f0', floorCol: '#8aaabf',
-      hotspots: [
-        { x: 330, y: GROUND, label: 'Bañar a los niños', maxPresses: 3 },
-        { x: 620, y: GROUND, label: 'Preparar mochila (mañana)' },
-        { x: 900, y: GROUND, label: 'Tu aseo propio' },
-        { x: 1120, y: GROUND, label: 'Continuar', isExit: true },
-      ],
-      deadline: 1320,
-      notifs: [{ time: 1307, text: 'Quedan 13 minutos. Los niños no están bañados.' }]
-    }),
-
-    // ── E16: Salón 22:15 — 15 segundos para ti ───────────────────────────────
-    {
-      name: 'Salón — 22:15',
+      wallCol: '#2c1a10',
+      floorCol: '#180e08',
       entered: false,
-      countdown: 15,
-      done: false,
       hotspots: [
-        new Hotspot({ x: 480, y: GROUND, label: 'Ver algo en la tele' }),
-        new Hotspot({ x: 780, y: GROUND, label: 'Revisar el móvil' }),
+        new Hotspot({ x: 520, y: GROUND, label: 'Cenar', maxPresses: 1 }),
       ],
-
       update(dt) {
         if (!this.entered) {
           this.entered = true;
-          showNotif('15 segundos para ti. Solo 15.');
+          player.x = START_X;
+          player.targetX = null;
+          player.pendingHotspot = null;
+          showNotif('Por fin, la cena.');
         }
         movePlayer(dt);
-        interactHotspots(this.hotspots, this.name, null);
-
-        this.countdown -= dt;
-        if (this.countdown <= 0 && !this.done) {
-          this.done = true;
-          showNotif('El tiempo para ti ha terminado.');
+        interactHotspots(this.hotspots, this.name, null, () => {
+          showNotif('Después de cenar, a dormir.');
           gotoScene(scenes.indexOf(this) + 1);
-        }
+        });
       },
-
       draw() {
-        drawRoomBg('#18283a', '#0c1622', '#101e2e');
-
-        // Big countdown
-        const t = Math.max(0, this.countdown);
-        ctx.fillStyle = t < 5 ? '#e74c3c' : '#f1c40f';
-        ctx.font = 'bold 80px monospace'; ctx.textAlign = 'center';
-        ctx.fillText(Math.ceil(t), W / 2, H / 2 - 40);
-        ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '20px sans-serif';
-        ctx.fillText('segundos para ti', W / 2, H / 2 + 12);
-
+        drawRoomBg(this.wallCol, this.floorCol);
         drawHotspots(this.hotspots, player.x, player.y);
         drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
         drawHUD(this.name);
       }
     },
-
     // ── E17: Dormitorio 23:00 — fundido final ─────────────────────────────────
     {
       name: 'Dormitorio — 23:00',
@@ -1685,10 +1607,10 @@ function buildScenes() {
           const fa = Math.min(1, (this._t - 3) / 2.5);
           ctx.fillStyle = `rgba(0,0,0,${fa})`; ctx.fillRect(0, 0, W, H);
           ctx.fillStyle = `rgba(255,255,255,${Math.min(1, (this._t - 3.5) / 2)})`;
-          ctx.font = 'italic 26px serif'; ctx.textAlign = 'center';
+          ctx.font = 'italic 26px Inter'; ctx.textAlign = 'center';
           ctx.fillText('Mañana es otro día.', W / 2, H / 2 - 16);
           ctx.fillStyle = `rgba(200,200,200,${Math.min(1, (this._t - 4.5) / 2)})`;
-          ctx.font = '18px sans-serif';
+          ctx.font = '18px Inter';
           ctx.fillText('(Y empieza igual que hoy.)', W / 2, H / 2 + 22);
         }
 

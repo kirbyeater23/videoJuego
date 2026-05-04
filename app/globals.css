@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -18,7 +18,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  font-family: Inter, Arial, Helvetica, sans-serif;
+  font-family: Inter;
 }
 
 .game-shell {
@@ -39,6 +39,7 @@ canvas {
   cursor: pointer;
   max-width: none;
   max-height: none;
+  border-radius: 16px;
 }
 
 .react-hud {
@@ -51,15 +52,17 @@ canvas {
 .hint-chip {
   position: absolute;
   left: 50%;
-  bottom: clamp(12px, 2.2vh, 26px);
-  transform: translateX(-50%);
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.5);
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 12px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  top: calc(var(--game-canvas-top, 0px) - 8px);
+  transform: translate(-50%, -100%);
+  padding: 4px;
+  background: rgba(90, 90, 90, 0.88);
+  color: rgba(255, 255, 255, 0.82);
+  font-family: Inter;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
-  backdrop-filter: blur(8px);
 }
 
 .hud-asset {
@@ -90,7 +93,7 @@ canvas {
   font-size: clamp(7px, 0.74vw, 11px);
   font-weight: 700;
   line-height: 1.1;
-  font-family: Inter, Arial, Helvetica, sans-serif;
+  font-family: Inter;
   transform: rotate(-1deg);
 }
 
@@ -132,7 +135,7 @@ canvas {
   align-items: center;
   justify-content: center;
   color: #9d2e22;
-  font: 700 clamp(16px, 2.4vw, 31px) / 1 monospace;
+  font: 700 clamp(16px, 2.4vw, 31px) / 1 Inter;
   transform: rotate(-1deg);
 }
 

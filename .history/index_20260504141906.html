@@ -18,7 +18,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      font-family: Inter;
+      font-family: Inter, Inter;
     }
     .game-shell {
       position: relative;
@@ -49,10 +49,10 @@
       left: 50%;
       top: calc(var(--game-canvas-top, 0px) - 8px);
       transform: translate(-50%, -100%);
-      padding: 4px;
+      padding: 1rem;
       background: rgba(130, 126, 126, 0.88);
       color: rgba(255,255,255,0.82);
-      font-family: Inter;
+      font-family: Inter, Inter;
       font-weight: 700;
       font-size: 14px;
       line-height: 1;
@@ -84,7 +84,7 @@
       color: #e84444;
       font-size: clamp(7px, 0.74vw, 11px);
       line-height: 1.1;
-      font-family: Inter;
+      font-family: Inter, Inter;
       font-weight: 700;
       transform: rotate(-1deg);
     }
@@ -141,9 +141,9 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      font-size: clamp(16px, 1.2vw, 31px);
+      font-size: clamp(11px, 1.2vw, 15px);
       line-height: 1.3;
-      
+      text-shadow: 0 1px 2px rgba(0,0,0,0.55);
       filter: drop-shadow(3px 8px 3px rgba(0,0,0,0.18));
       overflow: hidden;
     }
