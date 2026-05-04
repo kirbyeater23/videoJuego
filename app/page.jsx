@@ -72,7 +72,7 @@ export default function Home() {
       <canvas id="c" />
       <section className={`react-hud${hud.titleActive ? ' is-title' : ''}`}>
         <div className="hud-asset tasks-paper">
-          <img className="hud-img" src="/assets/img/objetos/tareas.png" alt="" />
+          <img className="hud-img" src="/assets/img/objetos/tareas.png" alt="" draggable="false" />
           <div className="tasks-lines">
             <div className="tasks-title">Tareas</div>
             {hud.currentTasks.length ? (
@@ -96,12 +96,16 @@ export default function Home() {
           </div>
         </div>
         <div className="hud-asset clock-object">
-          <img className="hud-img" src="/assets/img/objetos/relojVacioContador.png" alt="" />
+          <img className="hud-img" src="/assets/img/objetos/relojVacioContador.png" alt="" draggable="false" />
           <div className="clock-text">{hud.clock}</div>
         </div>
         {hud.notification ? <div className="notice"><span className="notice-text">{displayNotification}</span></div> : null}
         <div className="hint-chip">A / D para moverte · clic para interactuar</div>
       </section>
+      <div className="touch-controls" aria-label="Controles táctiles">
+        <button className="touch-btn" type="button" data-move-key="left" aria-label="Mover a la izquierda">‹</button>
+        <button className="touch-btn" type="button" data-move-key="right" aria-label="Mover a la derecha">›</button>
+      </div>
       <Script src="https://unpkg.com/gsap@3/dist/gsap.min.js" strategy="beforeInteractive" />
       <Script src="/js/game.js" strategy="afterInteractive" />
     </main>

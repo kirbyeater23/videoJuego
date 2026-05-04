@@ -4,6 +4,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -40,6 +41,9 @@ canvas {
   max-width: none;
   max-height: none;
   border-radius: 16px;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .react-hud {
@@ -75,12 +79,15 @@ canvas {
   width: 100%;
   height: auto;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 .tasks-paper {
-  left: clamp(14px, 3vw, 56px);
-  top: clamp(6px, 1.2vh, 16px);
-  width: clamp(150px, 16vw, 250px);
+  left: clamp(8px, 1.6vw, 22px);
+  top: clamp(8px, 2.2vh, 24px);
+  width: clamp(92px, 15vw, 250px);
   filter: drop-shadow(4px 8px 3px rgba(0, 0, 0, 0.22));
 }
 
@@ -90,7 +97,7 @@ canvas {
   top: 22%;
   width: 52%;
   color: #d81716;
-  font-size: clamp(7px, 0.74vw, 11px);
+  font-size: clamp(5px, 0.68vw, 11px);
   font-weight: 700;
   line-height: 1.1;
   font-family: Inter;
@@ -122,9 +129,9 @@ canvas {
 }
 
 .clock-object {
-  right: 22px;
-  top: 38px;
-  width: clamp(96px, 12vw, 160px);
+  right: clamp(8px, 1.6vw, 22px);
+  top: clamp(8px, 3.5vh, 38px);
+  width: clamp(64px, 10.5vw, 160px);
   filter: drop-shadow(3px 5px 2px rgba(0, 0, 0, 0.28));
 }
 
@@ -141,21 +148,22 @@ canvas {
 
 .notice {
   position: absolute;
-  right: clamp(-220px, -12vw, -90px);
-  top: clamp(64px, 8vh, 98px);
-  width: min(860px, 72vw);
+  right: clamp(-18px, -1vw, -6px);
+  top: clamp(62px, 12vh, 132px);
+  width: clamp(260px, 48vw, 680px);
   aspect-ratio: 1417 / 349;
-  padding: clamp(24px, 2.25vw, 36px) clamp(150px, 13vw, 210px) clamp(22px, 2vw, 34px) clamp(150px, 13vw, 210px);
+  min-height: clamp(44px, 7vw, 74px);
+  padding: clamp(10px, 1.8vw, 24px) clamp(18px, 2.2vw, 34px) clamp(8px, 1.4vw, 16px) clamp(72px, 13vw, 178px);
   background-image: url('/assets/img/objetos/notificacion.png');
   background-repeat: no-repeat;
-  background-size: 135.5% auto;
-  background-position: 58% 18%;
+  background-size: 100% auto;
+  background-position: center;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: clamp(11px, 1.2vw, 15px);
+  font-size: clamp(10px, 1.1vw, 18px);
   line-height: 1.3;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   filter: drop-shadow(3px 8px 3px rgba(0, 0, 0, 0.18));
@@ -201,6 +209,8 @@ canvas {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .touch-btn:active {
@@ -210,27 +220,28 @@ canvas {
 
 @media (max-width: 720px) {
   .tasks-paper {
-    width: 120px;
+    width: clamp(78px, 27vw, 132px);
     left: 8px;
     top: 4px;
   }
 
   .tasks-lines {
-    font-size: 6px;
+    font-size: clamp(4.5px, 1.35vw, 6.5px);
   }
 
   .clock-object {
-    width: 76px;
+    width: clamp(56px, 18vw, 86px);
     right: 8px;
     top: 6px;
   }
 
   .notice {
-    top: 62px;
-    right: -82px;
-    width: 430px;
-    padding: 15px 88px 13px 88px;
-    font-size: 10px;
+    top: 76px;
+    right: -74px;
+    width: clamp(300px, 92vw, 430px);
+    min-height: clamp(44px, 13vw, 58px);
+    padding: clamp(10px, 3vw, 15px) clamp(74px, 21vw, 92px) clamp(8px, 2.5vw, 13px) clamp(74px, 21vw, 92px);
+    font-size: clamp(9px, 2.5vw, 11px);
   }
 
   .hint-chip {
@@ -248,14 +259,43 @@ canvas {
 @media (max-width: 720px) and (orientation: portrait) {
   .tasks-paper {
     top: 12px;
+    width: clamp(82px, 29vw, 128px);
   }
 
   .clock-object {
     top: 14px;
+    width: clamp(58px, 19vw, 84px);
+  }
+
+  .notice {
+    top: clamp(58px, 12vh, 86px);
   }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
+  .tasks-paper {
+    width: clamp(80px, 12vw, 142px);
+    top: 6px;
+  }
+
+  .tasks-lines {
+    font-size: clamp(4.5px, 0.72vw, 7px);
+  }
+
+  .clock-object {
+    width: clamp(58px, 8vw, 92px);
+    top: 8px;
+  }
+
+  .notice {
+    top: clamp(42px, 11vh, 64px);
+    right: clamp(-120px, -10vw, -62px);
+    width: clamp(340px, 46vw, 560px);
+    min-height: clamp(42px, 6vw, 62px);
+    padding: clamp(10px, 1.7vw, 18px) clamp(86px, 10vw, 140px) clamp(8px, 1.3vw, 14px) clamp(86px, 10vw, 140px);
+    font-size: clamp(9px, 1.3vw, 13px);
+  }
+
   .touch-controls {
     left: 0;
     top: 50%;
