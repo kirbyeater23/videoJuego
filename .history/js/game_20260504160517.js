@@ -1044,7 +1044,7 @@ function makeOfficeScene() {
         fireNotifs(this.notifs, this.notifFired);
         if (p >= 1) {
           this.deadlineFired = true;
-          
+          stopSfx('reloj');
           advance(this);
         }
         return;
@@ -1284,9 +1284,10 @@ function makeHospitalConsultScene() {
       fireNotifs(this.notifs, this.notifFired);
       if (p >= 1) {
         this._done = true;
-        
+        stopSfx('reloj');
         if (!this._lateMissed) {
           this._lateMissed = true;
+          if (addMissed('Recoger a los niños de extraescolares', this.name)) exhaustion = Math.min(3, exhaustion + 1);
         }
         advance(this);
       }
@@ -1606,7 +1607,35 @@ function buildScenes() {
     }),
     makeGrandmaDropoffScene(),
 
-
+    // ── E17: Extraescolares tarde (auto-fallo) 18:15 ──────────────────────────
+    {
+      name: 'Extraescolares — 18:15 (tarde)',
+      bgKey: 'calle',
+      entered: false,
+      _t: 0,
+      update(dt) {
+        if (!this.entered) {
+          this.entered = true;
+          this._t = 0;
+          showNotif('Llegas tarde. Tus hijos llevan esperando mucho tiempo solos.');
+          exhaustion = Math.min(3, exhaustion + 1);
+        }
+        movePlayer(dt);
+        this._t += dt;
+        if (this._t > 7 || player.x > W - 80) gotoScene(scenes.indexOf(this) + 1);
+      },
+      draw() {
+        const calleMaxScroll = Math.max(0, (IMG['calle']?.width || W) - W);
+        if (!drawBgImage('calle', Math.min(calleMaxScroll, this._t * 70))) {
+          ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = '#7a8c5a'; ctx.fillRect(0, GROUND - 10, W, H);
+        }
+        ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 17px Inter'; ctx.textAlign = 'center';
+        ctx.fillText('Tus hijos te esperan… llevan mucho tiempo solos.', W / 2, 90);
+        drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
+        drawHUD(this.name);
+      }
+    },
 
     // ── E18: Comedor 21:00 ───────────────────────────────────────────────────
     {

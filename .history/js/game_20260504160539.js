@@ -1044,7 +1044,7 @@ function makeOfficeScene() {
         fireNotifs(this.notifs, this.notifFired);
         if (p >= 1) {
           this.deadlineFired = true;
-          
+          stopSfx('reloj');
           advance(this);
         }
         return;
@@ -1284,7 +1284,7 @@ function makeHospitalConsultScene() {
       fireNotifs(this.notifs, this.notifFired);
       if (p >= 1) {
         this._done = true;
-        
+        stopSfx('reloj');
         if (!this._lateMissed) {
           this._lateMissed = true;
         }
