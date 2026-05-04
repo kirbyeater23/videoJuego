@@ -432,12 +432,27 @@ function drawHotspots(hotspots, px, py) {
       ctx.fillText(hs.progress + '/' + hs.maxPresses, hs.x, hs.y + hs.r + 18);
     }
     if (near) {
+      const bubbleW = 240;
+      const bubbleH = 58;
+      const bubbleX = Math.max(12, Math.min(W - bubbleW - 12, px - bubbleW / 2));
+      const bubbleY = Math.max(18, py - PLAYER_H - 74);
+      const radius = bubbleH / 2;
+
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
-      ctx.fillRect(hs.x - 90, hs.y - hs.r - 38, 180, 28);
-      ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(hs.label, hs.x, hs.y - hs.r - 17);
-      ctx.fillStyle = '#f1c40f'; ctx.font = '12px sans-serif';
-      ctx.fillText('Clic para interactuar', hs.x, hs.y + hs.r + 34);
+      ctx.beginPath();
+      ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, radius);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.font = '700 16px Inter, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(hs.label, bubbleX + bubbleW / 2, bubbleY + 22);
+
+      ctx.fillStyle = '#f1c40f';
+      ctx.font = '600 13px Inter, Arial, sans-serif';
+      ctx.fillText('Clic para interactuar', bubbleX + bubbleW / 2, bubbleY + 40);
+      ctx.textBaseline = 'alphabetic';
     }
   });
 }
