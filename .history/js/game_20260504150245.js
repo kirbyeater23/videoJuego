@@ -1128,7 +1128,6 @@ function makeGrandmaPickupScene() {
         drawCar(this.carX, H - 340, 470, 'car_solo');
         if (Math.abs(this.carX - 690) < 260) drawHotspots([door], door.x, door.y);
       } else {
-        drawCar(this.carX, H - 340, 470, 'car_solo');
         drawHotspots([grandma], grandma.x, grandma.y);
       }
       drawHUD(this.name);
