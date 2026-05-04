@@ -222,7 +222,7 @@ function drawSceneObjects(objects = []) {
 }
 
 function drawCar(x, y, w, key = 'coche') {
-  if (key === 'car_with_children' || key === 'car_solo') {
+  if (key === 'car_with_children' || key === 'car_solo' || key === 'car_grandma') {
     const h = w * 0.7;
     return drawImageCrop(key, 1432, 548, 3672, 2576, x, y, w, h);
   }
@@ -312,6 +312,21 @@ function drawPlayer(px, py, dir, wt, exh, moving, maxH = PLAYER_H) {
   else                { ctx.arc( 0, my + 9, 10, Math.PI + 0.5, -0.5); }
   ctx.stroke();
 
+  ctx.restore();
+}
+
+function drawGrandma(px, py, dir, wt, moving, maxH = 470) {
+  const spriteKey = moving
+    ? (Math.floor(wt * WALK_ANIM_FPS) % 2 === 0 ? 'abuela_walk_1' : 'abuela_walk_2')
+    : 'abuela_side';
+  const sprite = IMG[spriteKey] || IMG['abuela_side'] || IMG['abuela_front'];
+  if (!sprite) return;
+  const h = maxH;
+  const w = sprite.width * (h / sprite.height);
+  ctx.save();
+  ctx.translate(px, py);
+  if (dir < 0) ctx.scale(-1, 1);
+  ctx.drawImage(sprite, -w / 2, -h, w, h);
   ctx.restore();
 }
 
@@ -421,6 +436,7 @@ class Hotspot {
 }
 
 function drawHotspots(hotspots, px, py) {
+  const nearHotspots = [];
   hotspots.forEach(hs => {
     if (hs.done) return;
     const near = hs.isNear(px, py);
@@ -431,30 +447,40 @@ function drawHotspots(hotspots, px, py) {
       ctx.fillStyle = '#f1c40f'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(hs.progress + '/' + hs.maxPresses, hs.x, hs.y + hs.r + 18);
     }
-    if (near) {
-      const bubbleW = 240;
-      const bubbleH = 58;
-      const bubbleX = Math.max(12, Math.min(W - bubbleW - 12, px - bubbleW / 2));
-      const bubbleY = Math.max(18, py - PLAYER_H - 74);
-      const radius = bubbleH / 2;
+    if (near) nearHotspots.push(hs);
+  });
+  const bubbleW = 280;
+  const bubbleH = 76;
+  const gap = 14;
+  const rowW = nearHotspots.length * bubbleW + Math.max(0, nearHotspots.length - 1) * gap;
+  const startX = Math.max(12, Math.min(W - rowW - 12, px - rowW / 2));
+  const bubbleY = Math.max(18, py - PLAYER_H - 74);
+  const radius = bubbleH / 2;
 
-      ctx.fillStyle = 'rgba(0,0,0,0.65)';
-      ctx.beginPath();
-      ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, radius);
-      ctx.fill();
+  nearHotspots.forEach((hs, i) => {
+    const bubbleX = startX + i * (bubbleW + gap);
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.beginPath();
+    ctx.roundRect(bubbleX, bubbleY, bubbleW, bubbleH, radius);
+    ctx.fill();
 
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 1rem Inter, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(hs.label, bubbleX + bubbleW / 2, bubbleY + 22);
+
+    ctx.fillStyle = '#f1c40f';
+    ctx.font = '600 1rem Inter, Arial, sans-serif';
+    ctx.fillText('Clic para interactuar', bubbleX + bubbleW / 2, bubbleY + 43);
+    if (hs.maxPresses > 1) {
+      const remaining = Math.max(1, hs.maxPresses - hs.progress);
       ctx.fillStyle = '#fff';
-      ctx.font = '700 16px Inter, Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(hs.label, bubbleX + bubbleW / 2, bubbleY + 22);
-
-      ctx.fillStyle = '#f1c40f';
-      ctx.font = '600 13px Inter, Arial, sans-serif';
-      ctx.fillText('Clic para interactuar', bubbleX + bubbleW / 2, bubbleY + 40);
-      ctx.textBaseline = 'alphabetic';
+      ctx.font = '600 1rem Inter, Arial, sans-serif';
+      ctx.fillText(`${remaining} clics`, bubbleX + bubbleW / 2, bubbleY + 62);
     }
   });
+  ctx.textBaseline = 'alphabetic';
 }
 
 // ─── COMMON UPDATE LOGIC ─────────────────────────────────────────────────────
@@ -836,7 +862,7 @@ function makeSchoolDoorScene(cfg) {
           this.done = true;
           this.bgKey = cfg.bgAfterKey || 'colegio_puerta';
           addDone(this.door.label, this.name);
-          showNotif(cfg.doneText || 'La niña entra al colegio.');
+          showNotif(cfg.doneText || 'Los niños entran al colegio.');
         }
       } else {
         const carSpeed = 470;
@@ -885,10 +911,10 @@ function makeOfficeScene() {
     deadlineFired: false,
     notifs: [
       { time: 600, text: 'Tu madre llama. No puedes coger el teléfono.' },
-      { time: 660, text: 'Mensaje del colegio: "Tu hija no se encuentra bien."' },
+      { time: 660, text: 'Mensaje del colegio: "Tus hijos no se encuentran bien."' },
       { time: 720, text: 'Tu madre vuelve a llamar. Tercera vez hoy.' },
       { time: 790, text: 'Jefa: "¿Tienes listo el informe?"' },
-      { time: 820, text: 'Son las 13:40. Debes salir en 20 minutos para recoger a la niña.' },
+      { time: 820, text: 'Son las 13:40. Debes salir en 20 minutos para recoger a los niños.' },
     ],
     notifFired: [],
     hotspots: [desk],
@@ -957,7 +983,7 @@ function makeOfficeScene() {
       if (!drawBgImage(this.bgKey)) drawRoomBg('#cfd8dc', '#6a808c');
       if (!this.timelapseActive) {
         drawHotspots(this.hotspots, player.x, player.y);
-        drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving, 360);
+        drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving, 520);
       } else {
         drawSpriteGrounded('madre_sitting', W - 380, GROUND + 8, 320);
         const p = Math.min(1, this.timelapseTimer / this.timelapseDuration);
@@ -966,6 +992,277 @@ function makeOfficeScene() {
         ctx.fillStyle = '#f1c40f';
         ctx.fillRect(W / 2 - 220, H - 60, 440 * p, 16);
       }
+      drawHUD(this.name);
+    }
+  };
+}
+
+function moveSceneCar(scene, dt, opts = {}) {
+  const speed = opts.speed || 520;
+  const minX = opts.minX ?? -EDGE_EXIT;
+  const maxX = opts.maxX ?? (W + EDGE_EXIT + 260);
+  if (K['KeyA']) scene.carX -= speed * dt;
+  if (K['KeyD']) scene.carX += speed * dt;
+  scene.carX = Math.max(minX, Math.min(maxX, scene.carX));
+}
+
+function drawWalkingPair() {
+  const grandmaX = player.x - player.dir * 120;
+  drawGrandma(grandmaX, player.y, player.dir, player.walkT, player.moving);
+  drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
+}
+
+function makeGrandmaPickupScene() {
+  const door = new Hotspot({ x: 690, y: GROUND, label: 'Llamar a la puerta', hitbox: { x: 965, y: 800, w: 150, h: 145 } });
+  const grandma = new Hotspot({ x: 840, y: GROUND, label: 'Recoger a mamá', hitbox: { x: 1140, y: 520, w: 210, h: 380 } });
+  return {
+    name: 'Casa de la abuela — 16:00',
+    bgKey: 'casa_abuela',
+    entered: false,
+    phase: 'door',
+    carX: 150,
+    update(dt) {
+      if (!this.entered) {
+        this.entered = true;
+        this.phase = 'door';
+        this.bgKey = 'casa_abuela';
+        this.carX = 150;
+        showNotif('Has llegado a casa de tu madre.');
+      }
+      if (this.phase === 'drive') {
+        moveSceneCar(this, dt, { minX: 40 });
+        if (this.carX > W + EDGE_EXIT) advance(this);
+        return;
+      }
+      const active = this.phase === 'door' ? door : grandma;
+      if (pointer.clicked && active.isClicked(pointer.x, pointer.y)) {
+        if (this.phase === 'door') {
+          this.phase = 'grandma';
+          this.bgKey = 'casa_abuela_con_abuela';
+          addDone(active.label, this.name);
+          showNotif('Tu madre sale a la puerta.');
+        } else {
+          this.phase = 'drive';
+          this.bgKey = 'casa_abuela';
+          this.carX = 130;
+          addDone(active.label, this.name);
+          showNotif('Subís al coche para ir al hospital.');
+        }
+      }
+    },
+    draw() {
+      drawBgImage(this.bgKey);
+      if (this.phase === 'drive') {
+        drawCar(this.carX, H - 340, 470, 'car_grandma');
+      } else {
+        const active = this.phase === 'door' ? door : grandma;
+        drawHotspots([active], active.x, active.y);
+      }
+      drawHUD(this.name);
+    }
+  };
+}
+
+function makeHospitalArrivalScene() {
+  const door = new Hotspot({ x: 780, y: GROUND, label: 'Entrar al hospital', hitbox: { x: 1080, y: 690, w: 210, h: 250 } });
+  return {
+    name: 'Hospital — 16:30',
+    bgKey: 'hospital',
+    entered: false,
+    carX: 80,
+    phase: 'arrive',
+    entryTimer: 0,
+    update(dt) {
+      if (!this.entered) {
+        this.entered = true;
+        this.phase = 'arrive';
+        this.entryTimer = 0;
+        this.carX = 80;
+        showNotif('Llegáis al hospital.');
+      }
+      if (this.phase === 'entry') {
+        this.entryTimer += dt;
+        if (this.entryTimer >= 3) advance(this);
+        return;
+      }
+      moveSceneCar(this, dt, { minX: 40, maxX: W - 540 });
+      if (Math.abs(this.carX - 690) < 240 && pointer.clicked && door.isClicked(pointer.x, pointer.y)) {
+        this.phase = 'entry';
+        this.bgKey = 'hospital_entrada_abuela_madre';
+        this.entryTimer = 0;
+        addDone(door.label, this.name);
+        showNotif('Entráis al hospital.');
+      }
+    },
+    draw() {
+      drawBgImage(this.bgKey);
+      if (this.phase === 'arrive') {
+        drawCar(this.carX, H - 340, 470, 'car_grandma');
+        if (Math.abs(this.carX - 690) < 240) drawHotspots([door], door.x, door.y);
+      } else {
+        const a = Math.max(0, (this.entryTimer - 2) / 1);
+        ctx.fillStyle = `rgba(0,0,0,${Math.min(1, a)})`;
+        ctx.fillRect(0, 0, W, H);
+      }
+      drawHUD(this.name);
+    }
+  };
+}
+
+function makeHospitalInteriorEntryScene() {
+  const door = new Hotspot({ x: 760, y: GROUND, label: 'Entrar a consulta', hitbox: { x: 1045, y: 230, w: 210, h: 460 } });
+  return {
+    name: 'Interior hospital — 16:35',
+    bgKey: 'hospital_interior',
+    entered: false,
+    update(dt) {
+      if (!this.entered) {
+        this.entered = true;
+        player.x = 260;
+        player.targetX = null;
+        player.pendingHotspot = null;
+        showNotif('Acompaña a tu madre hasta la consulta.');
+      }
+      movePlayer(dt);
+      if (pointer.clicked && door.isClicked(pointer.x, pointer.y)) {
+        addDone(door.label, this.name);
+        advance(this);
+      }
+    },
+    draw() {
+      drawBgImage(this.bgKey);
+      drawHotspots([door], player.x, player.y);
+      drawWalkingPair();
+      drawHUD(this.name);
+    }
+  };
+}
+
+function makeHospitalConsultScene() {
+  return {
+    name: 'Consulta — 16:40',
+    bgKey: 'hospital_madre_sentada',
+    entered: false,
+    waitUntil: 1065,
+    timelapseTimer: 0,
+    timelapseDuration: 9,
+    timelapseStart: 0,
+    notifs: [
+      { time: 1005, text: 'Lleváis media hora esperando.' },
+      { time: 1042, text: 'Tu jefa manda un correo urgente. Tus hijos mandan un audio.' },
+      { time: 1058, text: 'La extraescolar termina en 7 minutos.' },
+    ],
+    notifFired: [],
+    _lateMissed: false,
+    update(dt) {
+      if (!this.entered) {
+        this.entered = true;
+        this.timelapseTimer = 0;
+        this.timelapseStart = gameMin;
+        showNotif('Ahora toca esperar la consulta.');
+      }
+      this.timelapseTimer += dt;
+      const p = Math.min(1, this.timelapseTimer / this.timelapseDuration);
+      gameMin = Math.min(this.waitUntil, this.timelapseStart + (this.waitUntil - this.timelapseStart) * p);
+      fireNotifs(this.notifs, this.notifFired);
+      if (p >= 1) {
+        if (!this._lateMissed) {
+          this._lateMissed = true;
+          if (addMissed('Recoger a los niños de extraescolares', this.name)) exhaustion = Math.min(3, exhaustion + 1);
+        }
+        advance(this);
+      }
+    },
+    draw() {
+      drawBgImage(this.bgKey);
+      const p = Math.min(1, this.timelapseTimer / this.timelapseDuration);
+      ctx.fillStyle = 'rgba(0,0,0,0.42)';
+      ctx.fillRect(W / 2 - 230, H - 64, 460, 16);
+      ctx.fillStyle = '#3498db';
+      ctx.fillRect(W / 2 - 230, H - 64, 460 * p, 16);
+      ctx.fillStyle = '#fff';
+      ctx.font = '18px Inter, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Esperando en consulta...', W / 2, H - 78);
+      drawHUD(this.name);
+    }
+  };
+}
+
+function makeHospitalInteriorExitScene() {
+  return {
+    name: 'Salida del hospital — 17:45',
+    bgKey: 'hospital_interior',
+    entered: false,
+    update(dt) {
+      if (!this.entered) {
+        this.entered = true;
+        player.x = 300;
+        player.targetX = null;
+        player.pendingHotspot = null;
+        showNotif('Salid del hospital.');
+      }
+      movePlayer(dt, { allowExit: true });
+      if (player.x > W + EDGE_EXIT) advance(this);
+    },
+    draw() {
+      drawBgImage(this.bgKey);
+      drawWalkingPair();
+      drawHUD(this.name);
+    }
+  };
+}
+
+function makeHospitalCarExitScene() {
+  return {
+    name: 'Parking hospital — 17:50',
+    bgKey: 'hospital',
+    entered: false,
+    carX: 120,
+    update(dt) {
+      if (!this.entered) {
+        this.entered = true;
+        this.carX = 120;
+        showNotif('Volvéis al coche.');
+      }
+      moveSceneCar(this, dt, { minX: 40 });
+      if (this.carX > W + EDGE_EXIT) advance(this);
+    },
+    draw() {
+      drawBgImage(this.bgKey);
+      drawCar(this.carX, H - 340, 470, 'car_grandma');
+      drawHUD(this.name);
+    }
+  };
+}
+
+function makeGrandmaDropoffScene() {
+  const door = new Hotspot({ x: 690, y: GROUND, label: 'Dejar a mamá en casa', hitbox: { x: 965, y: 800, w: 150, h: 145 } });
+  return {
+    name: 'Casa de la abuela — 18:05',
+    bgKey: 'casa_abuela',
+    entered: false,
+    carX: 150,
+    dropped: false,
+    update(dt) {
+      if (!this.entered) {
+        this.entered = true;
+        this.carX = 150;
+        this.dropped = false;
+        showNotif('Deja a tu madre en casa.');
+      }
+      moveSceneCar(this, dt, { minX: 40, maxX: this.dropped ? W + EDGE_EXIT + 260 : W - 540 });
+      if (!this.dropped && pointer.clicked && door.isClicked(pointer.x, pointer.y)) {
+        this.dropped = true;
+        addDone(door.label, this.name);
+        showNotif('Tu madre ya está en casa. Sigues sola.');
+      }
+      if (this.dropped && this.carX > W + EDGE_EXIT) advance(this);
+    },
+    draw() {
+      drawBgImage(this.bgKey);
+      drawCar(this.carX, H - 340, 470, this.dropped ? 'car_solo' : 'car_grandma');
+      if (!this.dropped) drawHotspots([door], door.x, door.y);
       drawHUD(this.name);
     }
   };
@@ -1108,7 +1405,7 @@ function buildScenes() {
       ],
       deadline: 495,
       notifs: [
-        { time: 432, text: 'La niña no quiere comer. "¡Come algo!"' },
+        { time: 432, text: 'Los niños no quieren comer. "¡Comed algo!"' },
         { time: 460, text: 'Mensaje de tu madre: "¿Cuándo vienes hoy?"' },
         { time: 480, text: 'Tu jefa: "¿Puedes revisar el informe antes de las 9?"' },
       ],
@@ -1121,11 +1418,11 @@ function buildScenes() {
     makeSchoolDoorScene({
       name: 'Camino al colegio — 08:15',
       doorLabel: 'Entrar al colegio',
-      doneText: 'La niña entra al colegio.',
+      doneText: 'Los niños entran al colegio.',
       carBeforeKey: 'car_with_children',
       carAfterKey: 'car_solo',
       deadline: 510, deadlineLabel: 'Llegar al colegio a tiempo',
-      notifs: [{ time: 500, text: 'La niña camina despacio. Llegaréis tarde.' }]
+      notifs: [{ time: 500, text: 'Los niños caminan despacio. Llegaréis tarde.' }]
     }),
 
     // ── E4: Camino al trabajo scroll 08:30 → deadline 09:00 ──────────────────
@@ -1141,16 +1438,16 @@ function buildScenes() {
     // ── E5: Oficina 09:00 → forzado a las 14:00 ──────────────────────────────
     makeOfficeScene(),
 
-    // ── E6: Recoger a la niña scroll 14:00 → deadline 14:30 ──────────────────
+    // ── E6: Recoger a los niños scroll 14:00 → deadline 14:30 ──────────────────
     makeSchoolDoorScene({
-      name: 'Recoger a la niña — 14:00',
-      doorLabel: 'Recoger a la niña',
-      doneText: 'La niña te espera en la puerta.',
+      name: 'Recoger a los niños — 14:00',
+      doorLabel: 'Recoger a los niños',
+      doneText: 'Los niños te esperan en la puerta.',
       carBeforeKey: 'car_solo',
       carAfterKey: 'car_with_children',
       bgBeforeKey: 'colegio_puerta',
       bgAfterKey: 'colegio',
-      deadline: 870, deadlineLabel: 'Recoger a la niña a tiempo',
+      deadline: 870, deadlineLabel: 'Recoger a los niños a tiempo',
       notifs: [{ time: 848, text: 'Las 14:08. Las otras madres ya se han ido.' }]
     }),
 
@@ -1159,15 +1456,15 @@ function buildScenes() {
       name: 'Cocina — 14:30',
       bgKey: 'cocina_desayuno_1',
       hotspots: [
-        { x: 600, y: GROUND, label: 'Preparar la comida', maxPresses: 3, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
-        { x: 600, y: GROUND, label: 'Comer con la niña', maxPresses: 1, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
-        { x: 600, y: GROUND, label: 'Recoger la cocina', maxPresses: 2, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
-        { x: 600, y: GROUND, label: 'Buscar pastillas de mamá', maxPresses: 1, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
+        { x: 430, y: GROUND, label: 'Preparar la comida', maxPresses: 3, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
+        { x: 610, y: GROUND, label: 'Comer con los niños', maxPresses: 1, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
+        { x: 980, y: GROUND, label: 'Recoger la cocina', maxPresses: 2, hitbox: { x: 1435, y: 510, w: 235, h: 230 } },
+        { x: 1120, y: GROUND, label: 'Buscar pastillas de mamá', maxPresses: 1, hitbox: { x: 1600, y: 90, w: 305, h: 660 } },
         { x: 1160, y: GROUND, label: 'Salir', isExit: true },
       ],
       deadline: 930,
       notifs: [
-        { time: 878, text: 'La niña: "No me gusta esto."' },
+        { time: 878, text: 'Los niños: "No nos gusta esto."' },
         { time: 908, text: 'Tu madre: "¿Cuándo traes las pastillas?"' },
       ],
       onHotspotDone(scene, hs) {
@@ -1179,132 +1476,27 @@ function buildScenes() {
     makeScrollScene({
       name: 'A extraescolares — 15:30',
       bgKey: 'calle', endX: 1400,
-      deadline: 960, deadlineLabel: 'Llevar a la niña a extraescolares',
+      deadline: 960, deadlineLabel: 'Llevar a los niños a extraescolares',
       notifs: []
     }),
 
-    // ── E9: Casa de la abuela 16:00 → deadline 16:30 ─────────────────────────
-    makeStaticScene({
-      name: 'Casa de la abuela — 16:00',
-      bgKey: 'casa_abuela',
-      wallCol: '#d4c0a4', floorCol: '#7a6050',
-      hotspots: [
-        { x: 260, y: GROUND, label: 'Entregar pastillas' },
-        { x: 500, y: GROUND, label: 'Preparar cena de mamá', maxPresses: 2 },
-        { x: 760, y: GROUND, label: 'Escuchar a mamá', maxPresses: 2 },
-        { x: 1010, y: GROUND, label: 'Revisar medicación semanal' },
-        { x: 1180, y: GROUND, label: 'Salir', isExit: true },
-      ],
-      deadline: 990,
-      notifs: [
-        { time: 968, text: 'Tu madre: "Nunca tienes tiempo para mí."' },
-        { time: 982, text: 'El médico llama: "Necesita revisión urgente."' },
-      ]
-    }),
-
-    // ── E10: Hospital (espera forzada hasta 17:45) ────────────────────────────
-    {
-      name: 'Hospital — 16:30',
-      bgKey: 'hospital_interior',
-      entered: false,
-      waitUntil: 1065,
-      hotspots: [
-        new Hotspot({ x: 640, y: GROUND, label: 'Entrar a consulta', hitbox: { x: 825, y: 255, w: 290, h: 520 } }),
-      ],
-      notifs: [
-        { time: 1005, text: 'Lleváis media hora esperando.' },
-        { time: 1028, text: 'Por fin os llaman. Solo 10 minutos de consulta.' },
-        { time: 1042, text: 'Tu jefa manda un correo urgente. Tu hija manda un audio.' },
-        { time: 1058, text: 'La extraescolar termina en 7 minutos.' },
-      ],
-      notifFired: [],
-      _lateMissed: false,
-      _consulting: false,
-      _doorDone: false,
-      _internalFade: 0,
-      _fadeDir: 0,
-
-      update(dt) {
-        if (!this.entered) {
-          this.entered = true;
-          this.bgKey = 'hospital_interior';
-          this._consulting = false;
-          this._doorDone = false;
-          this._internalFade = 0;
-          this._fadeDir = 0;
-          showNotif('Sala de espera. Entra cuando os llamen.');
-        }
-        if (!this._consulting) {
-          movePlayer(dt);
-          interactHotspots(this.hotspots, this.name, null, hs => {
-            if (hs.label === 'Entrar a consulta') {
-              this._doorDone = true;
-              this._fadeDir = 1;
-              showNotif('Entráis a consulta.');
-            }
-          });
-        }
-        if (this._fadeDir === 1) {
-          this._internalFade = Math.min(1, this._internalFade + dt * FADE_SPEED);
-          if (this._internalFade >= 1) {
-            this._fadeDir = -1;
-            this._consulting = true;
-            this.bgKey = 'hospital_madre_sentada';
-          }
-        } else if (this._fadeDir === -1) {
-          this._internalFade = Math.max(0, this._internalFade - dt * FADE_SPEED);
-          if (this._internalFade <= 0) this._fadeDir = 0;
-        }
-        fireNotifs(this.notifs, this.notifFired);
-
-        if (gameMin >= this.waitUntil) {
-          if (!this._lateMissed) {
-            this._lateMissed = true;
-            if (addMissed('Recoger a la niña de extraescolares', this.name)) exhaustion = Math.min(3, exhaustion + 1);
-          }
-          gotoScene(scenes.indexOf(this) + 1);
-        }
-      },
-
-      draw() {
-        if (!drawBgImage(this.bgKey)) {
-          drawRoomBg('#e0eef8', '#8aaabf');
-          // waiting room chairs
-          for (let i = 0; i < 5; i++) {
-            ctx.fillStyle = '#b0c8dc';
-            ctx.fillRect(120 + i * 210, GROUND - 72, 65, 62);
-            ctx.fillStyle = '#90a8bc';
-            ctx.fillRect(120 + i * 210, GROUND - 92, 65, 22);
-          }
-        }
-        drawHotspots(this.hotspots, player.x, player.y);
-
-        // Wait progress bar
-        const prog = Math.min(1, (gameMin - 990) / (this.waitUntil - 990));
-        ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.font = '15px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('Esperando turno en el hospital…', W / 2, H - 46);
-        ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(W / 2 - 160, H - 28, 320, 12);
-        ctx.fillStyle = '#3498db'; ctx.fillRect(W / 2 - 160, H - 28, 320 * prog, 12);
-
-        if (!this._consulting && !this._doorDone) {
-          drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
-        }
-        if (this._internalFade > 0) {
-          ctx.fillStyle = `rgba(0,0,0,${this._internalFade})`;
-          ctx.fillRect(0, 0, W, H);
-        }
-        drawHUD(this.name);
-      }
-    },
-
-    // ── E11: Vuelta de casa de la abuela scroll 17:45 ─────────────────────────
+    // ── E9-E16: Casa de la abuela y hospital ─────────────────────────────────
+    makeGrandmaPickupScene(),
+    makeHospitalArrivalScene(),
+    makeHospitalInteriorEntryScene(),
+    makeHospitalConsultScene(),
+    makeHospitalInteriorExitScene(),
+    makeHospitalCarExitScene(),
     makeScrollScene({
-      name: 'Vuelta a casa — 17:45',
-      bgKey: 'casa_abuela', endX: 1200,
-      notifs: [{ time: 1066, text: 'Tu hija lleva más de una hora esperando sola.' }]
+      name: 'Camino a casa de la abuela — 17:55',
+      bgKey: 'calle', endX: 1200,
+      vehicle: 'car',
+      carKey: 'car_grandma',
+      notifs: [{ time: 1066, text: 'Tus hijos llevan más de una hora esperando solos.' }]
     }),
+    makeGrandmaDropoffScene(),
 
-    // ── E12: Extraescolares tarde (auto-fallo) 18:15 ──────────────────────────
+    // ── E17: Extraescolares tarde (auto-fallo) 18:15 ──────────────────────────
     {
       name: 'Extraescolares — 18:15 (tarde)',
       bgKey: 'calle',
@@ -1313,7 +1505,7 @@ function buildScenes() {
       update(dt) {
         if (!this.entered) {
           this.entered = true;
-          showNotif('Llegas tarde. Tu hija lleva esperando mucho tiempo sola.');
+          showNotif('Llegas tarde. Tus hijos llevan esperando mucho tiempo solos.');
           exhaustion = Math.min(3, exhaustion + 1);
         }
         movePlayer(dt);
@@ -1327,7 +1519,7 @@ function buildScenes() {
           ctx.fillStyle = '#7a8c5a'; ctx.fillRect(0, GROUND - 10, W, H);
         }
         ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 17px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('Tu hija te espera… lleva mucho tiempo sola.', W / 2, 90);
+        ctx.fillText('Tus hijos te esperan… llevan mucho tiempo solos.', W / 2, 90);
         drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
         drawHUD(this.name);
       }
@@ -1343,14 +1535,14 @@ function buildScenes() {
       deadlineFired: false,
       hotspots: [
         new Hotspot({ x: 160, y: GROUND, label: 'Hacer la cena', maxPresses: 4, imgKey: 'cena' }),
-        new Hotspot({ x: 420, y: GROUND, label: 'Deberes con la niña', maxPresses: 3 }),
+        new Hotspot({ x: 420, y: GROUND, label: 'Deberes con los niños', maxPresses: 3 }),
         new Hotspot({ x: 680, y: GROUND, label: 'Llamar a mamá (noche)', maxPresses: 1 }),
         new Hotspot({ x: 920, y: GROUND, label: 'Poner lavadora' }),
         new Hotspot({ x: 1120, y: GROUND, label: 'Limpiar baño', maxPresses: 2 }),
         new Hotspot({ x: 1160, y: GROUND - 55, label: 'Informe jefa (urgente)', maxPresses: 2 }),
       ],
       notifs: [
-        { time: 1122, text: 'Tu hija llora. Dice que nunca estás con ella.' },
+        { time: 1122, text: 'Tus hijos lloran. Dicen que nunca estás con ellos.' },
         { time: 1152, text: 'Tu madre: "No me has llamado en todo el día."' },
         { time: 1182, text: 'Jefa: "¿Puedes terminar el informe esta noche?"' },
         { time: 1218, text: 'Son las 20:18. La cena no está. Los deberes, a medias.' },
@@ -1395,7 +1587,7 @@ function buildScenes() {
       wallCol: '#2c1a10', floorCol: '#180e08',
       hotspots: [
         { x: 360, y: GROUND, label: 'Cenar (por fin)' },
-        { x: 650, y: GROUND, label: 'Hablar con tu hija' },
+        { x: 650, y: GROUND, label: 'Hablar con tus hijos' },
         { x: 900, y: GROUND, label: 'Fregar los platos', maxPresses: 1 },
         { x: 1150, y: GROUND, label: 'Continuar', isExit: true },
       ],
@@ -1407,13 +1599,13 @@ function buildScenes() {
       name: 'Baño — 21:45',
       wallCol: '#d6e8f0', floorCol: '#8aaabf',
       hotspots: [
-        { x: 330, y: GROUND, label: 'Bañar a la niña', maxPresses: 3 },
+        { x: 330, y: GROUND, label: 'Bañar a los niños', maxPresses: 3 },
         { x: 620, y: GROUND, label: 'Preparar mochila (mañana)' },
         { x: 900, y: GROUND, label: 'Tu aseo propio' },
         { x: 1120, y: GROUND, label: 'Continuar', isExit: true },
       ],
       deadline: 1320,
-      notifs: [{ time: 1307, text: 'Quedan 13 minutos. La niña no está bañada.' }]
+      notifs: [{ time: 1307, text: 'Quedan 13 minutos. Los niños no están bañados.' }]
     }),
 
     // ── E16: Salón 22:15 — 15 segundos para ti ───────────────────────────────
@@ -1593,7 +1785,9 @@ async function init() {
     loadImg('colegio',           'assets/img/fondos/colegio.png'),
     loadImg('colegio_puerta',    'assets/img/fondos/colegioNinosPuerta.png'),
     loadImg('casa_abuela',       'assets/img/fondos/casa abuela.png'),
+    loadImg('casa_abuela_con_abuela', 'assets/img/fondos/casaAbuelaConAbuela.png'),
     loadImg('hospital',          'assets/img/fondos/hospital.png'),
+    loadImg('hospital_entrada_abuela_madre', 'assets/img/fondos/hospitalEntradaAbuelaYMadre.png'),
     loadImg('habitacion',        'assets/img/fondos/habitacionDespertadorApagado.png'),
     loadImg('madre_durmiendo_1', 'assets/img/fondos/madreDurmiendoHabitacion1.png'),
     loadImg('madre_durmiendo_2', 'assets/img/fondos/madreDurmiendoHabitacion2.png'),
@@ -1607,6 +1801,10 @@ async function init() {
     loadImg('madre_front',       'assets/img/personajes/madreFrente.png'),
     loadImg('madre_back',        'assets/img/personajes/madreEspaldas.png'),
     loadImg('madre_sitting',     'assets/img/personajes/madreSentada.png'),
+    loadImg('abuela_side',       'assets/img/personajes/abuelaLado.png'),
+    loadImg('abuela_walk_1',     'assets/img/personajes/abuelaAndando1.png'),
+    loadImg('abuela_walk_2',     'assets/img/personajes/abuelaAndando2.png'),
+    loadImg('abuela_front',      'assets/img/personajes/abuelaFrente.png'),
     loadImg('taza_1',            'assets/img/objetos/tazaDesayuno1.png'),
     loadImg('taza_2',            'assets/img/objetos/tazaDesayuno2.png'),
     loadImg('comida',            'assets/img/objetos/comida.png'),
@@ -1614,6 +1812,7 @@ async function init() {
     loadImg('coche',             'assets/img/objetos/coche bueno.png'),
     loadImg('car_with_children', 'assets/img/personajes/madreCocheNinos.png'),
     loadImg('car_solo',          'assets/img/personajes/madreCocheSola.png'),
+    loadImg('car_grandma',       'assets/img/personajes/mamaConduciendoAbuela.png'),
     loadImg('notif',             'assets/img/objetos/notificacion.png'),
     loadImg('clock',             'assets/img/objetos/relojVacioContador.png'),
     loadImg('tareas',            'assets/img/objetos/tareas.png'),
