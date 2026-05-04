@@ -788,7 +788,7 @@ function makeSchoolDoorScene(cfg) {
 
   return {
     name: cfg.name,
-    bgKey: 'colegio',
+    bgKey: cfg.bgBeforeKey || 'colegio',
     deadline: cfg.deadline || null,
     deadlineLabel: cfg.deadlineLabel || cfg.name,
     notifs: cfg.notifs || [],
@@ -802,7 +802,7 @@ function makeSchoolDoorScene(cfg) {
     update(dt) {
       if (!this.entered) {
         this.entered = true;
-        this.bgKey = 'colegio';
+        this.bgKey = cfg.bgBeforeKey || 'colegio';
         this.carX = 80;
         this.done = false;
         player.x = START_X;
@@ -819,7 +819,7 @@ function makeSchoolDoorScene(cfg) {
         const carAtDoor = Math.abs(this.carX - this.carStopX) < 180;
         if (carAtDoor && pointer.clicked && this.door.isClicked(pointer.x, pointer.y)) {
           this.done = true;
-          this.bgKey = 'colegio_puerta';
+          this.bgKey = cfg.bgAfterKey || 'colegio_puerta';
           addDone(this.door.label, this.name);
           showNotif(cfg.doneText || 'La niña entra al colegio.');
         }
@@ -1133,6 +1133,8 @@ function buildScenes() {
       doneText: 'La niña te espera en la puerta.',
       carBeforeKey: 'car_solo',
       carAfterKey: 'car_with_children',
+      bgBeforeKey: 'colegio_puerta',
+      bgAfterKey: 'colegio',
       deadline: 870, deadlineLabel: 'Recoger a la niña a tiempo',
       notifs: [{ time: 848, text: 'Las 14:08. Las otras madres ya se han ido.' }]
     }),
