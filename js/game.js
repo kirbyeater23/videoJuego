@@ -221,9 +221,13 @@ function drawSceneObjects(objects = []) {
   });
 }
 
-function drawCar(x, y, w) {
+function drawCar(x, y, w, key = 'coche') {
+  if (key === 'car_with_children' || key === 'car_solo') {
+    const h = w * 0.7;
+    return drawImageCrop(key, 1432, 548, 3672, 2576, x, y, w, h);
+  }
   const h = w * 0.58;
-  return drawImageCrop('coche', 420, 160, 1080, 760, x, y, w, h);
+  return drawImageCrop(key, 420, 160, 1080, 760, x, y, w, h);
 }
 
 function drawRoomBg(wallCol, floorCol, baseboardCol) {
@@ -760,11 +764,11 @@ function makeScrollScene(cfg) {
       ctx.fillStyle = '#2ecc71'; ctx.fillRect(W / 2 - 160, H - 22, 320 * prog, 12);
 
       if (cfg.vehicle === 'car') {
-        drawCar(this.carX, H - 340, 470);
+        drawCar(this.carX, H - 340, 470, cfg.carKey || 'coche');
       } else if (this.bgKey === 'colegio') {
         const carW = 470;
         const carX = W - 470 + (1 - this.carT) * 480;
-        drawCar(carX, H - 365, carW);
+        drawCar(carX, H - 365, carW, cfg.carKey || 'coche');
       }
 
       if (cfg.vehicle !== 'car') drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving);
@@ -840,7 +844,7 @@ function makeSchoolDoorScene(cfg) {
         ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = '#7a8c5a'; ctx.fillRect(0, GROUND - 10, W, H);
       }
-      drawCar(this.carX, H - 340, 470);
+      drawCar(this.carX, H - 340, 470, this.done ? (cfg.carAfterKey || 'car_solo') : (cfg.carBeforeKey || 'car_with_children'));
       if (!this.done) {
         if (Math.abs(this.carX - this.carStopX) < 180) drawHotspots([this.door], this.door.x, this.door.y);
       }
@@ -854,7 +858,7 @@ function makeOfficeScene() {
     x: 940,
     y: GROUND,
     label: 'Trabajar en el escritorio',
-    maxPresses: 5,
+    maxPresses: 1,
     hitbox: { x: 1110, y: 455, w: 680, h: 400 },
   });
 
@@ -874,6 +878,10 @@ function makeOfficeScene() {
     notifFired: [],
     hotspots: [desk],
     seatedTimer: 0,
+    timelapseActive: false,
+    timelapseTimer: 0,
+    timelapseDuration: 8,
+    timelapseStart: 0,
 
     update(dt) {
       if (!this.entered) {
@@ -885,13 +893,16 @@ function makeOfficeScene() {
         showNotif('Llegas a la oficina.');
       }
 
-      if (this.seatedTimer > 0) {
-        this.seatedTimer -= dt;
-        if (this.seatedTimer <= 0) {
-          this.bgKey = 'oficina_vacia';
-          player.x = W - 260;
-          showNotif('Vuelves a levantarte.');
+      if (this.timelapseActive) {
+        this.timelapseTimer += dt;
+        const p = Math.min(1, this.timelapseTimer / this.timelapseDuration);
+        gameMin = Math.min(this.deadline, this.timelapseStart + (this.deadline - this.timelapseStart) * p);
+        fireNotifs(this.notifs, this.notifFired);
+        if (p >= 1) {
+          this.deadlineFired = true;
+          advance(this);
         }
+        return;
       } else {
         movePlayer(dt, { minX: W * 0.66, maxX: W - 40 });
         if (pointer.clicked && !desk.done && desk.isClicked(pointer.x, pointer.y) && !desk.isNear(player.x, player.y)) {
@@ -906,9 +917,12 @@ function makeOfficeScene() {
           const ok = desk.interact(this.hotspots);
           if (ok) {
             this.bgKey = 'oficina_sentada';
-            this.seatedTimer = 7;
+            this.timelapseActive = true;
+            this.timelapseTimer = 0;
+            this.timelapseStart = gameMin;
             player.pendingHotspot = null;
             if (desk.done) addDone(desk.label, this.name);
+            showNotif('Te sientas a trabajar. Las horas pasan.');
           }
         }
       }
@@ -926,11 +940,16 @@ function makeOfficeScene() {
 
     draw() {
       if (!drawBgImage(this.bgKey)) drawRoomBg('#cfd8dc', '#6a808c');
-      if (this.seatedTimer <= 0) {
+      if (!this.timelapseActive) {
         drawHotspots(this.hotspots, player.x, player.y);
         drawPlayer(player.x, player.y, player.dir, player.walkT, exhaustion, player.moving, 360);
       } else {
         drawSpriteGrounded('madre_sitting', W - 380, GROUND + 8, 320);
+        const p = Math.min(1, this.timelapseTimer / this.timelapseDuration);
+        ctx.fillStyle = 'rgba(0,0,0,0.42)';
+        ctx.fillRect(W / 2 - 220, H - 60, 440, 16);
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(W / 2 - 220, H - 60, 440 * p, 16);
       }
       drawHUD(this.name);
     }
@@ -1088,6 +1107,8 @@ function buildScenes() {
       name: 'Camino al colegio — 08:15',
       doorLabel: 'Entrar al colegio',
       doneText: 'La niña entra al colegio.',
+      carBeforeKey: 'car_with_children',
+      carAfterKey: 'car_solo',
       deadline: 510, deadlineLabel: 'Llegar al colegio a tiempo',
       notifs: [{ time: 500, text: 'La niña camina despacio. Llegaréis tarde.' }]
     }),
@@ -1097,6 +1118,7 @@ function buildScenes() {
       name: 'Camino al trabajo — 08:30',
       bgKey: 'calle', endX: 2200,
       vehicle: 'car',
+      carKey: 'car_solo',
       deadline: 540, deadlineLabel: 'Llegar al trabajo a tiempo',
       notifs: [{ time: 518, text: 'El bus sale en 2 minutos.' }]
     }),
@@ -1109,6 +1131,8 @@ function buildScenes() {
       name: 'Recoger a la niña — 14:00',
       doorLabel: 'Recoger a la niña',
       doneText: 'La niña te espera en la puerta.',
+      carBeforeKey: 'car_solo',
+      carAfterKey: 'car_with_children',
       deadline: 870, deadlineLabel: 'Recoger a la niña a tiempo',
       notifs: [{ time: 848, text: 'Las 14:08. Las otras madres ya se han ido.' }]
     }),
@@ -1567,6 +1591,8 @@ async function init() {
     loadImg('comida',            'assets/img/objetos/comida.png'),
     loadImg('cena',              'assets/img/objetos/cena.png'),
     loadImg('coche',             'assets/img/objetos/coche bueno.png'),
+    loadImg('car_with_children', 'assets/img/personajes/madreCocheNinos.png'),
+    loadImg('car_solo',          'assets/img/personajes/madreCocheSola.png'),
     loadImg('notif',             'assets/img/objetos/notificacion.png'),
     loadImg('clock',             'assets/img/objetos/relojVacioContador.png'),
     loadImg('tareas',            'assets/img/objetos/tareas.png'),
