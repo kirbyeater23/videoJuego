@@ -88,7 +88,7 @@
       font-size: 0.78em;
       text-transform: uppercase;
       letter-spacing: 0;
-      margin-bottom: 1px;
+      margin-bottom: 0.5rem;
     }
     .tasks-item {
       overflow: hidden;
@@ -134,11 +134,20 @@
       background-size: 100% auto;
       background-position: center;
       color: #fff;
-      text-align: left;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
       font-size: clamp(11px, 1.2vw, 15px);
       line-height: 1.3;
       text-shadow: 0 1px 2px rgba(0,0,0,0.55);
       filter: drop-shadow(3px 8px 3px rgba(0,0,0,0.18));
+      overflow: hidden;
+    }
+    .notice-text {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
       overflow: hidden;
     }
     .fade-layer {
@@ -190,7 +199,7 @@
           <img class="hud-img" src="assets/img/objetos/relojVacioContador.png" alt="">
           <div class="clock-text">{{ clock }}</div>
         </div>
-        <div class="notice" v-show="notification">{{ notification }}</div>
+        <div class="notice" v-show="notification"><span class="notice-text">{{ notification }}</span></div>
         <div class="hint-chip">A / D para moverte · clic para interactuar</div>
         <div class="fade-layer" ref="fadeLayer"></div>
       </section>

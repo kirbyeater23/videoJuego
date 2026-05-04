@@ -1142,7 +1142,7 @@ function buildScenes() {
     // ── E7: Cocina comida 14:30 → deadline 15:30 ─────────────────────────────
     makeStaticScene({
       name: 'Cocina — 14:30',
-      bgKey: 'cocina',
+      bgKey: 'cocina_desayuno_1',
       hotspots: [
         { x: 600, y: GROUND, label: 'Preparar la comida', maxPresses: 3, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
         { x: 600, y: GROUND, label: 'Comer con la niña', maxPresses: 1, hitbox: { x: 575, y: 555, w: 680, h: 250 } },
@@ -1154,7 +1154,10 @@ function buildScenes() {
       notifs: [
         { time: 878, text: 'La niña: "No me gusta esto."' },
         { time: 908, text: 'Tu madre: "¿Cuándo traes las pastillas?"' },
-      ]
+      ],
+      onHotspotDone(scene, hs) {
+        if (!hs.isExit) scene.bgKey = 'cocina_comida_2';
+      }
     }),
 
     // ── E8: Extraescolares scroll 15:30 → deadline 16:00 ─────────────────────
@@ -1570,6 +1573,7 @@ async function init() {
     loadImg('cocina',            'assets/img/fondos/cocina.png'),
     loadImg('cocina_desayuno_1', 'assets/img/fondos/cocinaDesayuno1.png'),
     loadImg('cocina_desayuno_2', 'assets/img/fondos/cocinaDesayuno2.png'),
+    loadImg('cocina_comida_2',   'assets/img/fondos/cocinaComida2.png'),
     loadImg('calle',             'assets/img/fondos/calle.png'),
     loadImg('colegio',           'assets/img/fondos/colegio.png'),
     loadImg('colegio_puerta',    'assets/img/fondos/colegioNinosPuerta.png'),

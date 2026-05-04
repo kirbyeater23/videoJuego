@@ -70,7 +70,7 @@ export default function Home() {
           <img className="hud-img" src="/assets/img/objetos/relojVacioContador.png" alt="" />
           <div className="clock-text">{hud.clock}</div>
         </div>
-        {hud.notification ? <div className="notice">{hud.notification}</div> : null}
+        {hud.notification ? <div className="notice"><span className="notice-text">{hud.notification}</span></div> : null}
         <div className="hint-chip">A / D para moverte · clic para interactuar</div>
       </section>
       <Script src="/js/game.js" strategy="afterInteractive" />
