@@ -176,6 +176,38 @@ canvas {
   display: none;
 }
 
+.touch-controls {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--game-canvas-bottom, 100vh) + 14px);
+  z-index: 5;
+  display: none;
+  gap: 18px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.touch-btn {
+  width: 62px;
+  height: 62px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(130, 126, 126, 0.92);
+  color: #fff;
+  font-family: Inter;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  touch-action: none;
+  user-select: none;
+}
+
+.touch-btn:active {
+  transform: scale(0.96);
+  background: rgba(95, 93, 93, 0.95);
+}
+
 @media (max-width: 720px) {
   .tasks-paper {
     width: 120px;
@@ -206,5 +238,31 @@ canvas {
     max-width: calc(100vw - 24px);
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .touch-controls {
+    display: flex;
+  }
+}
+
+@media (max-width: 720px) and (orientation: portrait) {
+  .tasks-paper {
+    top: 12px;
+  }
+
+  .clock-object {
+    top: 14px;
+  }
+}
+
+@media (max-height: 560px) and (orientation: landscape) {
+  .touch-controls {
+    left: 0;
+    top: 50%;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 max(10px, calc(var(--game-canvas-left, 0px) - 74px));
+    transform: translateY(-50%);
   }
 }

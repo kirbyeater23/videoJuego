@@ -15,16 +15,25 @@ const ctx = canvas.getContext('2d');
 canvas.width = W; canvas.height = H;
 
 function resize() {
+  const isPortraitMobile = window.matchMedia('(max-width: 720px) and (orientation: portrait)').matches;
   const verticalMargin = Math.max(96, window.innerHeight * 0.16);
-  const availableHeight = Math.max(240, window.innerHeight - verticalMargin);
+  const availableHeight = isPortraitMobile
+    ? Math.max(240, window.innerHeight * 0.5)
+    : Math.max(240, window.innerHeight - verticalMargin);
   const s = Math.min(window.innerWidth / W, availableHeight / H);
   const canvasW = W * s;
   const canvasH = H * s;
   canvas.style.width  = canvasW + 'px';
   canvas.style.height = canvasH + 'px';
-  document.documentElement.style.setProperty('--game-canvas-top', ((window.innerHeight - canvasH) / 2) + 'px');
+  const canvasLeft = (window.innerWidth - canvasW) / 2;
+  const canvasTop = (window.innerHeight - canvasH) / 2;
+  document.documentElement.style.setProperty('--game-canvas-left', canvasLeft + 'px');
+  document.documentElement.style.setProperty('--game-canvas-right', (canvasLeft + canvasW) + 'px');
+  document.documentElement.style.setProperty('--game-canvas-top', canvasTop + 'px');
+  document.documentElement.style.setProperty('--game-canvas-bottom', (canvasTop + canvasH) + 'px');
 }
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', resize);
 resize();
 
 // ─── INPUT ───────────────────────────────────────────────────────────────────
@@ -39,6 +48,33 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { delete K[e.code]; });
 function clearPressed() { for (const k in P) delete P[k]; }
 
+function setTouchMove(code, active) {
+  if (active) {
+    if (!K[code]) P[code] = true;
+    K[code] = true;
+  } else {
+    delete K[code];
+  }
+}
+
+function bindTouchControls() {
+  document.querySelectorAll('[data-move-key]').forEach(btn => {
+    const code = btn.dataset.moveKey === 'left' ? 'KeyA' : 'KeyD';
+    const start = e => {
+      e.preventDefault();
+      setTouchMove(code, true);
+    };
+    const stop = e => {
+      e.preventDefault();
+      setTouchMove(code, false);
+    };
+    btn.addEventListener('pointerdown', start);
+    btn.addEventListener('pointerup', stop);
+    btn.addEventListener('pointerleave', stop);
+    btn.addEventListener('pointercancel', stop);
+  });
+}
+
 canvas.addEventListener('pointerdown', e => {
   const r = canvas.getBoundingClientRect();
   pointer.x = ((e.clientX - r.left) / r.width) * W;
@@ -48,6 +84,7 @@ canvas.addEventListener('pointerdown', e => {
 });
 
 canvas.addEventListener('pointerup', () => { pointer.pressed = false; });
+bindTouchControls();
 
 // ─── ASSETS ──────────────────────────────────────────────────────────────────
 const IMG = {};
